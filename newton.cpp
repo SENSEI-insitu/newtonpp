@@ -6,6 +6,7 @@
 #include <cassert>
 #include <math.h>
 #include <deque>
+#include <cstring>
 
 struct patch
 {
@@ -46,25 +47,152 @@ void patch::operator=(const patch &p)
 
 struct patch_data
 {
-    long size() const { return m_m.size(); }
+    patch_data() : m_size(0), m_m(nullptr),
+        m_x(nullptr), m_y(nullptr), m_u(nullptr), m_v(nullptr) {}
+
+    patch_data(const patch_data&) = delete;
+    patch_data(patch_data&&) = delete;
+
+    ~patch_data();
+
+    void operator=(const patch_data &pd);
+    void operator=(patch_data &&pd);
+
+    long size() const { return m_size; }
+
+    void dealloc();
+    void alloc(long n);
     void resize(long n);
     void append(const patch_data &o);
 
-    std::vector<double> m_m; ///< body mass
-    std::vector<double> m_x; ///< body position x
-    std::vector<double> m_y; ///< body position y
-    std::vector<double> m_u; ///< body velocity x
-    std::vector<double> m_v; ///< body velocity y
+    long m_size;
+
+    double *m_m; ///< body mass
+    double *m_x; ///< body position x
+    double *m_y; ///< body position y
+    double *m_u; ///< body velocity x
+    double *m_v; ///< body velocity y
 };
+
+// --------------------------------------------------------------------------
+patch_data::~patch_data()
+{
+    dealloc();
+}
+
+// --------------------------------------------------------------------------
+void patch_data::operator=(const patch_data &pd)
+{
+
+    if (m_size < pd.m_size)
+    {
+        dealloc();
+        alloc(pd.m_size);
+    }
+    else
+    {
+        m_size = pd.m_size;
+    }
+
+    long nb = m_size*sizeof(double);
+
+    memcpy(m_m, pd.m_m, nb);
+    memcpy(m_x, pd.m_x, nb);
+    memcpy(m_y, pd.m_y, nb);
+    memcpy(m_u, pd.m_u, nb);
+    memcpy(m_v, pd.m_v, nb);
+}
+
+// --------------------------------------------------------------------------
+void patch_data::operator=(patch_data &&pd)
+{
+    dealloc();
+
+    m_size = pd.m_size;
+
+    m_m = pd.m_m;
+    m_x = pd.m_x;
+    m_y = pd.m_y;
+    m_u = pd.m_u;
+    m_v = pd.m_v;
+
+    pd.m_m = nullptr;
+    pd.m_x = nullptr;
+    pd.m_y = nullptr;
+    pd.m_u = nullptr;
+    pd.m_v = nullptr;
+
+    pd.m_size = 0;
+}
+
+// --------------------------------------------------------------------------
+void patch_data::alloc(long n)
+{
+    m_size = n;
+
+    size_t nb = n*sizeof(double);
+
+    m_m = (double*)malloc(nb);
+    m_x = (double*)malloc(nb);
+    m_y = (double*)malloc(nb);
+    m_u = (double*)malloc(nb);
+    m_v = (double*)malloc(nb);
+}
+
+
+// --------------------------------------------------------------------------
+void patch_data::dealloc()
+{
+    free(m_m);
+    free(m_x);
+    free(m_y);
+    free(m_u);
+    free(m_v);
+
+    m_size = 0;
+
+    m_m = nullptr;
+    m_x = nullptr;
+    m_y = nullptr;
+    m_u = nullptr;
+    m_v = nullptr;
+}
 
 // --------------------------------------------------------------------------
 void patch_data::resize(long n)
 {
-    m_m.resize(n);
-    m_x.resize(n);
-    m_y.resize(n);
-    m_u.resize(n);
-    m_v.resize(n);
+    if (n == 0)
+    {
+        dealloc();
+    }
+    else if (n > m_size)
+    {
+        size_t nbnew = n*sizeof(double);
+
+        double *tmp_m = (double*)malloc(nbnew);
+        double *tmp_x = (double*)malloc(nbnew);
+        double *tmp_y = (double*)malloc(nbnew);
+        double *tmp_u = (double*)malloc(nbnew);
+        double *tmp_v = (double*)malloc(nbnew);
+
+        size_t nbold = m_size*sizeof(double);
+
+        memcpy(tmp_m, m_m, nbold);
+        memcpy(tmp_x, m_x, nbold);
+        memcpy(tmp_y, m_y, nbold);
+        memcpy(tmp_u, m_u, nbold);
+        memcpy(tmp_v, m_v, nbold);
+
+        dealloc();
+
+        m_m = tmp_m;
+        m_x = tmp_x;
+        m_y = tmp_y;
+        m_u = tmp_u;
+        m_v = tmp_v;
+    }
+
+    m_size = n;
 }
 
 // --------------------------------------------------------------------------
@@ -127,9 +255,9 @@ void isend_mp(MPI_Comm comm, const patch_data &pd, int dest, int tag, MPI_Reques
     {
         nreq = 4;
 
-        MPI_Isend(pd.m_m.data(), n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
-        MPI_Isend(pd.m_x.data(), n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
-        MPI_Isend(pd.m_y.data(), n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
+        MPI_Isend(pd.m_m, n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
+        MPI_Isend(pd.m_x, n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
+        MPI_Isend(pd.m_y, n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
     }
 }
 
@@ -143,28 +271,130 @@ void recv_mp(MPI_Comm comm, patch_data &pd, int src, int tag)
 
     if (n)
     {
-        MPI_Recv(pd.m_m.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
-        MPI_Recv(pd.m_x.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
-        MPI_Recv(pd.m_y.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(pd.m_m, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(pd.m_x, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(pd.m_y, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
     }
 }
 
 
 struct patch_force
 {
-    long size() const { return m_u.size(); }
+    patch_force() : m_size(0), m_u(nullptr), m_v(nullptr) {}
+
+    patch_force(const patch_force&) = delete;
+    patch_force(patch_force&&) = delete;
+
+    ~patch_force();
+
+    void operator=(const patch_force &pd);
+    void operator=(patch_force &&pd);
+
+    long size() const { return m_size; }
+
+    void dealloc();
+    void alloc(long n);
     void resize(long n);
     void append(const patch_force &o);
 
-    std::vector<double> m_u;   ///< body force x
-    std::vector<double> m_v;   ///< body force y
+    long m_size;
+
+    double *m_u;   ///< body force x
+    double *m_v;   ///< body force y
 };
+
+// --------------------------------------------------------------------------
+patch_force::~patch_force()
+{
+    dealloc();
+}
+
+// --------------------------------------------------------------------------
+void patch_force::operator=(const patch_force &pd)
+{
+
+    if (m_size < pd.m_size)
+    {
+        dealloc();
+        alloc(pd.m_size);
+    }
+    else
+    {
+        m_size = pd.m_size;
+    }
+
+    long nb = m_size*sizeof(double);
+
+    memcpy(m_u, pd.m_u, nb);
+    memcpy(m_v, pd.m_v, nb);
+}
+
+// --------------------------------------------------------------------------
+void patch_force::operator=(patch_force &&pd)
+{
+    dealloc();
+
+    m_size = pd.m_size;
+
+    m_u = pd.m_u;
+    m_v = pd.m_v;
+
+    pd.m_u = nullptr;
+    pd.m_v = nullptr;
+
+    pd.m_size = 0;
+}
+
+// --------------------------------------------------------------------------
+void patch_force::alloc(long n)
+{
+    m_size = n;
+
+    size_t nb = n*sizeof(double);
+
+    m_u = (double*)malloc(nb);
+    m_v = (double*)malloc(nb);
+}
+
+
+// --------------------------------------------------------------------------
+void patch_force::dealloc()
+{
+    free(m_u);
+    free(m_v);
+
+    m_size = 0;
+
+    m_u = nullptr;
+    m_v = nullptr;
+}
 
 // --------------------------------------------------------------------------
 void patch_force::resize(long n)
 {
-    m_u.resize(n);
-    m_v.resize(n);
+    if (n == 0)
+    {
+        dealloc();
+    }
+    else if (n > m_size)
+    {
+        size_t nbnew = n*sizeof(double);
+
+        double *tmp_u = (double*)malloc(nbnew);
+        double *tmp_v = (double*)malloc(nbnew);
+
+        size_t nbold = m_size*sizeof(double);
+
+        memcpy(tmp_u, m_u, nbold);
+        memcpy(tmp_v, m_v, nbold);
+
+        dealloc();
+
+        m_u = tmp_u;
+        m_v = tmp_v;
+    }
+
+    m_size = n;
 }
 
 // --------------------------------------------------------------------------
@@ -299,8 +529,8 @@ void isend(MPI_Comm comm, const patch_force &pf, int dest, int tag)
 {
     long n = pf.size();
     MPI_Send(&n, 1, MPI_LONG, dest, ++tag, comm);
-    MPI_Send(pf.m_u.data(), n, MPI_DOUBLE, dest, ++tag, comm);
-    MPI_Send(pf.m_v.data(), n, MPI_DOUBLE, dest, ++tag, comm);
+    MPI_Send(pf.m_u, n, MPI_DOUBLE, dest, ++tag, comm);
+    MPI_Send(pf.m_v, n, MPI_DOUBLE, dest, ++tag, comm);
 }
 
 // --------------------------------------------------------------------------
@@ -311,8 +541,8 @@ void recv(MPI_Comm comm, patch_force &pf, int src, int tag)
 
     assert(pf.size() == n);
 
-    MPI_Recv(pf.m_u.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
-    MPI_Recv(pf.m_v.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+    MPI_Recv(pf.m_u, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+    MPI_Recv(pf.m_v, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
 }
 
 // --------------------------------------------------------------------------
@@ -328,13 +558,13 @@ void isend(MPI_Comm comm, const patch_data &pd, const patch_force &pf, int dest,
     {
         nreqs = 8;
 
-        MPI_Isend(pd.m_m.data(), n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
-        MPI_Isend(pd.m_x.data(), n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
-        MPI_Isend(pd.m_y.data(), n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
-        MPI_Isend(pd.m_u.data(), n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
-        MPI_Isend(pd.m_v.data(), n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
-        MPI_Isend(pf.m_u.data(), n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
-        MPI_Isend(pf.m_v.data(), n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
+        MPI_Isend(pd.m_m, n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
+        MPI_Isend(pd.m_x, n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
+        MPI_Isend(pd.m_y, n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
+        MPI_Isend(pd.m_u, n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
+        MPI_Isend(pd.m_v, n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
+        MPI_Isend(pf.m_u, n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
+        MPI_Isend(pf.m_v, n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
     }
 }
 
@@ -349,13 +579,13 @@ void recv(MPI_Comm comm, patch_data &pd, patch_force &pf, int src, int tag)
 
     if (n)
     {
-        MPI_Recv(pd.m_m.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
-        MPI_Recv(pd.m_x.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
-        MPI_Recv(pd.m_y.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
-        MPI_Recv(pd.m_u.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
-        MPI_Recv(pd.m_v.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
-        MPI_Recv(pf.m_u.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
-        MPI_Recv(pf.m_v.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(pd.m_m, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(pd.m_x, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(pd.m_y, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(pd.m_u, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(pd.m_v, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(pf.m_u, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(pf.m_v, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
     }
 }
 
@@ -927,8 +1157,8 @@ void move(MPI_Comm comm, patch_data &pd, patch_force &pf, const std::vector<int>
         }
     }
 
-    pd = pdo;
-    pf = pfo;
+    pd = std::move(pdo);
+    pf = std::move(pfo);
 }
 
 
@@ -1004,7 +1234,7 @@ const char *fmt_fname(MPI_Comm comm, const char *dir, const char *name)
     int rank = 0;
     MPI_Comm_rank(comm, &rank);
 
-    sprintf(fname, "%s/%s%d_%ld.vtk", dir, name, rank, fid);
+    sprintf(fname, "%s/%s%04d_%06ld.vtk", dir, name, rank, fid);
 
     fid += 1;
 
@@ -1019,6 +1249,7 @@ void write(MPI_Comm comm, const patch_data &pd, const patch_force &pf, const cha
 
     // package in the vtk layout
     long n = pd.size();
+
     std::vector<double> x(3*n);
     std::vector<double> m(n);
     std::vector<double> vu(n);
