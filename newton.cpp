@@ -8,38 +8,54 @@
 #include <deque>
 #include <cstring>
 
+#include "stream_compact.h"
+#include "hamr_buffer.h"
+
+
+hamr::buffer_allocator cpu_alloc = hamr::buffer_allocator::malloc;
+hamr::buffer_allocator gpu_alloc = hamr::buffer_allocator::openmp;
+
+#define ENABLE_OMP
+#if defined(ENABLE_OMP)
+hamr::buffer_allocator def_alloc = gpu_alloc;
+#else
+hamr::buffer_allocator def_alloc = cpu_alloc;
+#endif
+
+struct requests
+{
+    requests() : m_size(0) {}
+    int m_size;            ///< number of requests actually made
+    MPI_Request m_req[8];  ///< the requests
+    std::vector<std::shared_ptr<const double>> m_data; ///< memory accessed
+};
+
+
 struct patch
 {
     ~patch() {}
-    patch() : m_owner(-1), m_x{0.,0.,0.,0.} {}
-    patch(int owner, double x0, double x1, double y0, double y1) : m_owner(owner), m_x{x0, x1, y0, y1} {}
+    patch() : m_owner(-1), m_x(def_alloc, 4, 0.) {}
+
+    patch(int owner, double x0, double x1, double y0, double y1) : m_owner(owner), m_x(def_alloc, 4, {x0, x1, y0, y1}) {}
 
     patch(const patch &p);
     void operator=(const patch &p);
 
     int m_owner;
-    double m_x[4];
+    hamr::buffer<double> m_x;
 };
 
-
 // --------------------------------------------------------------------------
-patch::patch(const patch &p)
+patch::patch(const patch &p) : m_x(p.m_x)
 {
     m_owner = p.m_owner;
-    m_x[0] = p.m_x[0];
-    m_x[1] = p.m_x[1];
-    m_x[2] = p.m_x[2];
-    m_x[3] = p.m_x[3];
 }
 
 // --------------------------------------------------------------------------
 void patch::operator=(const patch &p)
 {
     m_owner = p.m_owner;
-    m_x[0] = p.m_x[0];
-    m_x[1] = p.m_x[1];
-    m_x[2] = p.m_x[2];
-    m_x[3] = p.m_x[3];
+    m_x.assign(p.m_x);
 }
 
 
@@ -47,8 +63,11 @@ void patch::operator=(const patch &p)
 
 struct patch_data
 {
-    patch_data() : m_size(0), m_m(nullptr),
-        m_x(nullptr), m_y(nullptr), m_u(nullptr), m_v(nullptr) {}
+    patch_data() : m_m(def_alloc), m_x(def_alloc),
+        m_y(def_alloc), m_u(def_alloc), m_v(def_alloc)
+    {
+        std::cerr << "patch_data::patch_data " << this << std::endl;
+    }
 
     patch_data(const patch_data&) = delete;
     patch_data(patch_data&&) = delete;
@@ -58,206 +77,138 @@ struct patch_data
     void operator=(const patch_data &pd);
     void operator=(patch_data &&pd);
 
-    long size() const { return m_size; }
+    long size() const { return m_m.size(); }
 
-    void dealloc();
-    void alloc(long n);
     void resize(long n);
     void append(const patch_data &o);
 
-    long m_size;
-
-    double *m_m; ///< body mass
-    double *m_x; ///< body position x
-    double *m_y; ///< body position y
-    double *m_u; ///< body velocity x
-    double *m_v; ///< body velocity y
+    hamr::buffer<double> m_m; ///< body mass
+    hamr::buffer<double> m_x; ///< body position x
+    hamr::buffer<double> m_y; ///< body position y
+    hamr::buffer<double> m_u; ///< body velocity x
+    hamr::buffer<double> m_v; ///< body velocity y
 };
 
 // --------------------------------------------------------------------------
 patch_data::~patch_data()
 {
-    dealloc();
+    std::cerr << "patch_data::~patch_data " << this << std::endl;
 }
 
 // --------------------------------------------------------------------------
 void patch_data::operator=(const patch_data &pd)
 {
+    std::cerr << "patch_data::operator= " << this << " <-- " << &pd << std::endl;
 
-    if (m_size < pd.m_size)
-    {
-        dealloc();
-        alloc(pd.m_size);
-    }
-    else
-    {
-        m_size = pd.m_size;
-    }
-
-    long nb = m_size*sizeof(double);
-
-    memcpy(m_m, pd.m_m, nb);
-    memcpy(m_x, pd.m_x, nb);
-    memcpy(m_y, pd.m_y, nb);
-    memcpy(m_u, pd.m_u, nb);
-    memcpy(m_v, pd.m_v, nb);
+    m_m.assign(pd.m_m);
+    m_x.assign(pd.m_x);
+    m_y.assign(pd.m_y);
+    m_u.assign(pd.m_u);
+    m_v.assign(pd.m_v);
 }
 
 // --------------------------------------------------------------------------
 void patch_data::operator=(patch_data &&pd)
 {
-    dealloc();
+    std::cerr << "patch_data::operator= && " << this << " <-- " << &pd << std::endl;
 
-    m_size = pd.m_size;
-
-    m_m = pd.m_m;
-    m_x = pd.m_x;
-    m_y = pd.m_y;
-    m_u = pd.m_u;
-    m_v = pd.m_v;
-
-    pd.m_m = nullptr;
-    pd.m_x = nullptr;
-    pd.m_y = nullptr;
-    pd.m_u = nullptr;
-    pd.m_v = nullptr;
-
-    pd.m_size = 0;
-}
-
-// --------------------------------------------------------------------------
-void patch_data::alloc(long n)
-{
-    m_size = n;
-
-    size_t nb = n*sizeof(double);
-
-    m_m = (double*)malloc(nb);
-    m_x = (double*)malloc(nb);
-    m_y = (double*)malloc(nb);
-    m_u = (double*)malloc(nb);
-    m_v = (double*)malloc(nb);
-}
-
-
-// --------------------------------------------------------------------------
-void patch_data::dealloc()
-{
-    free(m_m);
-    free(m_x);
-    free(m_y);
-    free(m_u);
-    free(m_v);
-
-    m_size = 0;
-
-    m_m = nullptr;
-    m_x = nullptr;
-    m_y = nullptr;
-    m_u = nullptr;
-    m_v = nullptr;
+    m_m = std::move(pd.m_m);
+    m_x = std::move(pd.m_x);
+    m_y = std::move(pd.m_y);
+    m_u = std::move(pd.m_u);
+    m_v = std::move(pd.m_v);
 }
 
 // --------------------------------------------------------------------------
 void patch_data::resize(long n)
 {
-    if (n == 0)
-    {
-        dealloc();
-    }
-    else if (n > m_size)
-    {
-        size_t nbnew = n*sizeof(double);
+    std::cerr << "patch_data::resize " << this << std::endl;
 
-        double *tmp_m = (double*)malloc(nbnew);
-        double *tmp_x = (double*)malloc(nbnew);
-        double *tmp_y = (double*)malloc(nbnew);
-        double *tmp_u = (double*)malloc(nbnew);
-        double *tmp_v = (double*)malloc(nbnew);
-
-        size_t nbold = m_size*sizeof(double);
-
-        memcpy(tmp_m, m_m, nbold);
-        memcpy(tmp_x, m_x, nbold);
-        memcpy(tmp_y, m_y, nbold);
-        memcpy(tmp_u, m_u, nbold);
-        memcpy(tmp_v, m_v, nbold);
-
-        dealloc();
-
-        m_m = tmp_m;
-        m_x = tmp_x;
-        m_y = tmp_y;
-        m_u = tmp_u;
-        m_v = tmp_v;
-    }
-
-    m_size = n;
+    m_m.resize(n);
+    m_x.resize(n);
+    m_y.resize(n);
+    m_u.resize(n);
+    m_v.resize(n);
 }
 
 // --------------------------------------------------------------------------
 void patch_data::append(const patch_data &o)
 {
-    long n = size();
-    long no = o.size();
+    std::cerr << "patch_data::append " << this << std::endl;
 
-    resize(n + no);
-
-    for (long i = 0; i < no; ++i)
-    {
-        m_m[n + i] = o.m_m[i];
-        m_x[n + i] = o.m_x[i];
-        m_y[n + i] = o.m_y[i];
-        m_u[n + i] = o.m_u[i];
-        m_v[n + i] = o.m_v[i];
-    }
+    m_m.append(o.m_m);
+    m_m.append(o.m_x);
+    m_m.append(o.m_y);
+    m_m.append(o.m_u);
+    m_m.append(o.m_v);
 }
-
-
-
-
 
 // --------------------------------------------------------------------------
 void reduce(const patch_data &pdi, patch_data &pdo)
 {
-    double m = 0.;
-    double x = 0.;
-    double y = 0.;
-
-    long n = pdi.size();
-    for (long i = 0; i < n; ++i)
-    {
-        m += pdi.m_m[i];
-        x += pdi.m_m[i]*pdi.m_x[i];
-        y += pdi.m_m[i]*pdi.m_y[i];
-    }
-
-    x /= m;
-    y /= m;
+    const double *mi = pdi.m_m.data();
+    const double *xi = pdi.m_x.data();
+    const double *yi = pdi.m_y.data();
 
     pdo.resize(1);
+    double *mo = pdo.m_m.data();
+    double *xo = pdo.m_x.data();
+    double *yo = pdo.m_y.data();
 
-    pdo.m_m[0] = m;
-    pdo.m_x[0] = x;
-    pdo.m_y[0] = y;
+    long n = pdi.size();
+    double m, x, y;
+    #pragma omp target enter data map(alloc: m,x,y), map(to: n)
+
+    #pragma omp target map(alloc: m,x,y)
+    {
+    m = 0.;
+    x = 0.;
+    y = 0.;
+    }
+
+    #pragma omp target teams distribute parallel for reduction(+: m,x,y), is_device_ptr(mi,xi,yi), map(alloc: m,x,y)
+    for (long i = 0; i < n; ++i)
+    {
+        m += mi[i];
+        x += mi[i]*xi[i];
+        y += mi[i]*yi[i];
+    }
+
+    #pragma omp target is_device_ptr(mo,xo,yo), map(alloc: m,x,y)
+    {
+    mo[0] = m;
+    xo[0] = x/m;
+    yo[0] = y/m;
+    }
+
+    #pragma omp target exit data map(release: m,x,y)
 }
 
 // --------------------------------------------------------------------------
-void isend_mp(MPI_Comm comm, const patch_data &pd, int dest, int tag, MPI_Request reqs[4], int &nreq)
+void isend_mp(MPI_Comm comm, const patch_data &pd, int dest, int tag, requests &reqs)
 {
     static long n;
 
-    nreq = 1;
+    reqs.m_size = 1;
+
     n = pd.size();
-    MPI_Isend(&n, 1, MPI_LONG, dest, tag, comm, reqs);
+    MPI_Isend(&n, 1, MPI_LONG, dest, tag, comm, reqs.m_req);
 
     if (n)
     {
-        nreq = 4;
+        reqs.m_size = 4;
 
-        MPI_Isend(pd.m_m, n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
-        MPI_Isend(pd.m_x, n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
-        MPI_Isend(pd.m_y, n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
+        auto spm = pd.m_m.get_cpu_accessible();
+        auto spx = pd.m_x.get_cpu_accessible();
+        auto spy = pd.m_y.get_cpu_accessible();
+
+        MPI_Request *req = reqs.m_req;
+
+        MPI_Isend(spm.get(), n, MPI_DOUBLE, dest, ++tag, comm, ++req);
+        MPI_Isend(spx.get(), n, MPI_DOUBLE, dest, ++tag, comm, ++req);
+        MPI_Isend(spy.get(), n, MPI_DOUBLE, dest, ++tag, comm, ++req);
+
+        reqs.m_data = {spm, spx, spy};
     }
 }
 
@@ -271,16 +222,27 @@ void recv_mp(MPI_Comm comm, patch_data &pd, int src, int tag)
 
     if (n)
     {
-        MPI_Recv(pd.m_m, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
-        MPI_Recv(pd.m_x, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
-        MPI_Recv(pd.m_y, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+        hamr::buffer<double> m(hamr::buffer_allocator::malloc, n);
+        hamr::buffer<double> x(hamr::buffer_allocator::malloc, n);
+        hamr::buffer<double> y(hamr::buffer_allocator::malloc, n);
+
+        MPI_Recv(m.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(x.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(y.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+
+        pd.m_m = std::move(m);
+        pd.m_x = std::move(x);
+        pd.m_y = std::move(y);
     }
 }
 
 
 struct patch_force
 {
-    patch_force() : m_size(0), m_u(nullptr), m_v(nullptr) {}
+    patch_force() : m_u(def_alloc), m_v(def_alloc)
+    {
+        std::cerr << "patch_force::patch_force " << this << std::endl;
+    }
 
     patch_force(const patch_force&) = delete;
     patch_force(patch_force&&) = delete;
@@ -290,126 +252,55 @@ struct patch_force
     void operator=(const patch_force &pd);
     void operator=(patch_force &&pd);
 
-    long size() const { return m_size; }
+    long size() const { return m_u.size(); }
 
-    void dealloc();
-    void alloc(long n);
     void resize(long n);
     void append(const patch_force &o);
 
-    long m_size;
-
-    double *m_u;   ///< body force x
-    double *m_v;   ///< body force y
+    hamr::buffer<double> m_u;   ///< body force x
+    hamr::buffer<double> m_v;   ///< body force y
 };
 
 // --------------------------------------------------------------------------
 patch_force::~patch_force()
 {
-    dealloc();
+    std::cerr << "patch_force::~patch_force " << this << std::endl;
 }
 
 // --------------------------------------------------------------------------
 void patch_force::operator=(const patch_force &pd)
 {
+    std::cerr << "patch_force::operator= " << this << " <-- " << &pd << std::endl;
 
-    if (m_size < pd.m_size)
-    {
-        dealloc();
-        alloc(pd.m_size);
-    }
-    else
-    {
-        m_size = pd.m_size;
-    }
-
-    long nb = m_size*sizeof(double);
-
-    memcpy(m_u, pd.m_u, nb);
-    memcpy(m_v, pd.m_v, nb);
+    m_u.assign(pd.m_u);
+    m_v.assign(pd.m_v);
 }
 
 // --------------------------------------------------------------------------
 void patch_force::operator=(patch_force &&pd)
 {
-    dealloc();
+    std::cerr << "patch_force::operator=&& " << this << " <-- " << &pd << std::endl;
 
-    m_size = pd.m_size;
-
-    m_u = pd.m_u;
-    m_v = pd.m_v;
-
-    pd.m_u = nullptr;
-    pd.m_v = nullptr;
-
-    pd.m_size = 0;
-}
-
-// --------------------------------------------------------------------------
-void patch_force::alloc(long n)
-{
-    m_size = n;
-
-    size_t nb = n*sizeof(double);
-
-    m_u = (double*)malloc(nb);
-    m_v = (double*)malloc(nb);
-}
-
-
-// --------------------------------------------------------------------------
-void patch_force::dealloc()
-{
-    free(m_u);
-    free(m_v);
-
-    m_size = 0;
-
-    m_u = nullptr;
-    m_v = nullptr;
+    m_u = std::move(pd.m_u);
+    m_v = std::move(pd.m_v);
 }
 
 // --------------------------------------------------------------------------
 void patch_force::resize(long n)
 {
-    if (n == 0)
-    {
-        dealloc();
-    }
-    else if (n > m_size)
-    {
-        size_t nbnew = n*sizeof(double);
+    std::cerr << "patch_force::resize " << this << std::endl;
 
-        double *tmp_u = (double*)malloc(nbnew);
-        double *tmp_v = (double*)malloc(nbnew);
-
-        size_t nbold = m_size*sizeof(double);
-
-        memcpy(tmp_u, m_u, nbold);
-        memcpy(tmp_v, m_v, nbold);
-
-        dealloc();
-
-        m_u = tmp_u;
-        m_v = tmp_v;
-    }
-
-    m_size = n;
+    m_u.resize(n);
+    m_v.resize(n);
 }
 
 // --------------------------------------------------------------------------
 void patch_force::append(const patch_force &o)
 {
-    long n = size();
-    long no = o.size();
+    std::cerr << "patch_force::append " << this << std::endl;
 
-    resize(n + no);
-
-    for (long i = 0; i < no; ++i)
-    {
-        m_u[n + i] = o.m_u[i];
-        m_v[n + i] = o.m_v[i];
-    }
+    m_u.append(o.m_u);
+    m_v.append(o.m_v);
 }
 
 
@@ -418,27 +309,6 @@ void patch_force::append(const patch_force &o)
 
 
 
-
-
-// --------------------------------------------------------------------------
-void copy(const patch_data &pdi, const patch_force &pfi, const std::vector<long> &ids, const std::vector<int> &mask, patch_data &pdo, patch_force &pfo)
-{
-    long ni = pdi.size();
-    for (long i = 0; i < ni; ++i)
-    {
-        if (mask[i])
-        {
-            long q = ids[i];
-            pdo.m_x[q] = pdi.m_x[i];
-            pdo.m_y[q] = pdi.m_y[i];
-            pdo.m_m[q] = pdi.m_m[i];
-            pdo.m_u[q] = pdi.m_u[i];
-            pdo.m_v[q] = pdi.m_v[i];
-            pfo.m_u[q] = pfi.m_u[i];
-            pfo.m_v[q] = pfi.m_v[i];
-        }
-    }
-}
 
 
 /** Calculates the forces from bodies on this MPI rank. This is written to
@@ -452,34 +322,50 @@ void forces(const patch_data &pd, patch_force &pf, double eps)
 
     assert(pf.size() == n);
 
+    double eps2 = eps*eps;
+
+    const double *pd_m = pd.m_m.data();
+    const double *pd_x = pd.m_x.data();
+    const double *pd_y = pd.m_y.data();
+
+    double *pf_u = pf.m_u.data();
+    double *pf_v = pf.m_v.data();
+
+    double fx,fy;
+    #pragma omp target enter data map(alloc: fx,fy)
+
     for (long i = 0; i < n; ++i)
     {
-        double fx = 0.0;
-        double fy = 0.0;
+        #pragma omp target map(alloc: fx,fy)
+        {
+        fx = 0.;
+        fy = 0.;
+        }
 
+        #pragma omp target teams distribute parallel for reduction(+: fx,fy) is_device_ptr(pd_m,pd_x,pd_y), map(alloc: fx,fy)
         for (long j = 0; j < n; ++j)
         {
-            double mi = pd.m_m[i];
-            double xi = pd.m_x[i];
-            double yi = pd.m_y[i];
+            double rx = pd_x[j] - pd_x[i];
+            double ry = pd_y[j] - pd_y[i];
 
-            double mj = pd.m_m[j];
-            double rx = pd.m_x[j] - xi;
-            double ry = pd.m_y[j] - yi;
-
-            double r2e2 = rx*rx + ry*ry + eps*eps;
+            double r2e2 = rx*rx + ry*ry + eps2;
             double r2e23 = r2e2*r2e2*r2e2;
 
             double G = 6.67408e-11;
-            double mf = G*mi*mj / sqrt(r2e23);
+            double mf = G*pd_m[i]*pd_m[j] / sqrt(r2e23);
 
-            fx += (i == j ? 0.0 : rx*mf);
-            fy += (i == j ? 0.0 : ry*mf);
+            fx += (i == j ? 0. : rx*mf);
+            fy += (i == j ? 0. : ry*mf);
         }
 
-        pf.m_u[i] = fx;
-        pf.m_v[i] = fy;
+        #pragma omp target is_device_ptr(pf_u,pf_v), map(alloc: fx,fy)
+        {
+        pf_u[i] = fx;
+        pf_v[i] = fy;
+        }
     }
+
+    #pragma omp target exit data map(release: fx,fy)
 }
 
 /** Accumulates the forces from bodies on another MPI rank.
@@ -490,37 +376,56 @@ void forces(const patch_data &lpd, const patch_data &rpd, patch_force &pf, doubl
     long n = lpd.size();
     long m = rpd.size();
 
-    assert(pf.size() == n);
+    pf.resize(n);
 
+    double eps2 = eps*eps;
+
+    const double *lpd_m = lpd.m_m.data();
+    const double *lpd_x = lpd.m_x.data();
+    const double *lpd_y = lpd.m_y.data();
+
+    const double *rpd_m = rpd.m_m.data();
+    const double *rpd_x = rpd.m_x.data();
+    const double *rpd_y = rpd.m_y.data();
+
+    double *pf_u = pf.m_u.data();
+    double *pf_v = pf.m_v.data();
+
+    double fx, fy;
+
+    #pragma omp target enter data map(alloc: fx,fy)
     for (long i = 0; i < n; ++i)
     {
-        double mi = lpd.m_m[i];
-        double xi = lpd.m_x[i];
-        double yi = lpd.m_y[i];
+        #pragma omp target map(alloc: fx,fy)
+        {
+        fx = 0.;
+        fy = 0.;
+        }
 
-        double fx = 0.0;
-        double fy = 0.0;
-
+        #pragma omp target teams distribute parallel for reduction(+: fx,fy) is_device_ptr(lpd_m,lpd_x,lpd_y, rpd_m,rpd_x,rpd_y), map(alloc: fx,fy)
         for (long j = 0; j < m; ++j)
         {
+            double rx = rpd_x[j] - lpd_x[i];
+            double ry = rpd_y[j] - lpd_y[i];
 
-            double mj = rpd.m_m[j];
-            double rx = rpd.m_x[j] - xi;
-            double ry = rpd.m_y[j] - yi;
-
-            double r2e2 = rx*rx + ry*ry + eps*eps;
+            double r2e2 = rx*rx + ry*ry + eps2;
             double r2e23 = r2e2*r2e2*r2e2;
 
             double G = 6.67408e-11;
-            double mf = G*mi*mj / sqrt(r2e23);
+            double mf = G*lpd_m[i]*rpd_m[j] / sqrt(r2e23);
 
             fx += rx*mf;
             fy += ry*mf;
         }
 
-        pf.m_u[i] = fx;
-        pf.m_v[i] = fy;
+        #pragma omp target is_device_ptr(pf_u,pf_v), map(alloc: fx,fy)
+        {
+        pf_u[i] = fx;
+        pf_v[i] = fy;
+        }
     }
+
+    #pragma omp target exit data map(release: eps2,m,n,fx,fy)
 }
 
 
@@ -528,9 +433,16 @@ void forces(const patch_data &lpd, const patch_data &rpd, patch_force &pf, doubl
 void isend(MPI_Comm comm, const patch_force &pf, int dest, int tag)
 {
     long n = pf.size();
+
+    auto spf_u = pf.m_u.get_cpu_accessible();
+    const double *pf_u = spf_u.get();
+
+    auto spf_v = pf.m_v.get_cpu_accessible();
+    const double *pf_v = spf_v.get();
+
     MPI_Send(&n, 1, MPI_LONG, dest, ++tag, comm);
-    MPI_Send(pf.m_u, n, MPI_DOUBLE, dest, ++tag, comm);
-    MPI_Send(pf.m_v, n, MPI_DOUBLE, dest, ++tag, comm);
+    MPI_Send(pf_u, n, MPI_DOUBLE, dest, ++tag, comm);
+    MPI_Send(pf_v, n, MPI_DOUBLE, dest, ++tag, comm);
 }
 
 // --------------------------------------------------------------------------
@@ -541,30 +453,48 @@ void recv(MPI_Comm comm, patch_force &pf, int src, int tag)
 
     assert(pf.size() == n);
 
-    MPI_Recv(pf.m_u, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
-    MPI_Recv(pf.m_v, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+    hamr::buffer<double> pf_u(hamr::buffer_allocator::malloc, n);
+    hamr::buffer<double> pf_v(hamr::buffer_allocator::malloc, n);
+
+    MPI_Recv(pf_u.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+    MPI_Recv(pf_v.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+
+    pf.m_u = std::move(pf_u);
+    pf.m_v = std::move(pf_v);
 }
 
 // --------------------------------------------------------------------------
-void isend(MPI_Comm comm, const patch_data &pd, const patch_force &pf, int dest, int tag, MPI_Request reqs[8], int &nreqs)
+void isend(MPI_Comm comm, const patch_data &pd,
+    const patch_force &pf, int dest, int tag, requests &reqs)
 {
     static long n;
 
-    nreqs = 1;
+    reqs.m_size = 1;
     n = pd.size();
-    MPI_Isend(&n, 1, MPI_LONG, dest, tag, comm, reqs);
+    MPI_Isend(&n, 1, MPI_LONG, dest, tag, comm, reqs.m_req);
 
     if (n)
     {
-        nreqs = 8;
+        auto pd_m = pd.m_m.get_cpu_accessible();
+        auto pd_x = pd.m_x.get_cpu_accessible();
+        auto pd_y = pd.m_y.get_cpu_accessible();
+        auto pd_u = pd.m_u.get_cpu_accessible();
+        auto pd_v = pd.m_v.get_cpu_accessible();
+        auto pf_u = pf.m_u.get_cpu_accessible();
+        auto pf_v = pf.m_v.get_cpu_accessible();
 
-        MPI_Isend(pd.m_m, n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
-        MPI_Isend(pd.m_x, n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
-        MPI_Isend(pd.m_y, n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
-        MPI_Isend(pd.m_u, n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
-        MPI_Isend(pd.m_v, n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
-        MPI_Isend(pf.m_u, n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
-        MPI_Isend(pf.m_v, n, MPI_DOUBLE, dest, ++tag, comm, ++reqs);
+        reqs.m_data = {pd_m, pd_x, pd_y, pd_u, pd_v, pf_u, pf_v};
+
+        reqs.m_size = 8;
+        MPI_Request *req = reqs.m_req;
+
+        MPI_Isend(pd_m.get(), n, MPI_DOUBLE, dest, ++tag, comm, ++req);
+        MPI_Isend(pd_x.get(), n, MPI_DOUBLE, dest, ++tag, comm, ++req);
+        MPI_Isend(pd_y.get(), n, MPI_DOUBLE, dest, ++tag, comm, ++req);
+        MPI_Isend(pd_u.get(), n, MPI_DOUBLE, dest, ++tag, comm, ++req);
+        MPI_Isend(pd_v.get(), n, MPI_DOUBLE, dest, ++tag, comm, ++req);
+        MPI_Isend(pf_u.get(), n, MPI_DOUBLE, dest, ++tag, comm, ++req);
+        MPI_Isend(pf_v.get(), n, MPI_DOUBLE, dest, ++tag, comm, ++req);
     }
 }
 
@@ -574,18 +504,34 @@ void recv(MPI_Comm comm, patch_data &pd, patch_force &pf, int src, int tag)
     long n = 0;
     MPI_Recv(&n, 1, MPI_LONG, src, tag, comm, MPI_STATUS_IGNORE);
 
-    pd.resize(n);
-    pf.resize(n);
+    pd.resize(0);
+    pf.resize(0);
 
     if (n)
     {
-        MPI_Recv(pd.m_m, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
-        MPI_Recv(pd.m_x, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
-        MPI_Recv(pd.m_y, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
-        MPI_Recv(pd.m_u, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
-        MPI_Recv(pd.m_v, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
-        MPI_Recv(pf.m_u, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
-        MPI_Recv(pf.m_v, n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+        hamr::buffer<double> tpd_m(cpu_alloc, n);
+        hamr::buffer<double> tpd_x(cpu_alloc, n);
+        hamr::buffer<double> tpd_y(cpu_alloc, n);
+        hamr::buffer<double> tpd_u(cpu_alloc, n);
+        hamr::buffer<double> tpd_v(cpu_alloc, n);
+        hamr::buffer<double> tpf_u(cpu_alloc, n);
+        hamr::buffer<double> tpf_v(cpu_alloc, n);
+
+        MPI_Recv(tpd_m.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(tpd_x.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(tpd_y.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(tpd_u.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(tpd_v.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(tpf_u.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(tpf_v.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+
+        pd.m_m = std::move(tpd_m);
+        pd.m_x = std::move(tpd_x);
+        pd.m_y = std::move(tpd_y);
+        pd.m_u = std::move(tpd_u);
+        pd.m_v = std::move(tpd_v);
+        pf.m_u = std::move(tpf_u);
+        pf.m_v = std::move(tpf_v);
     }
 }
 
@@ -598,31 +544,43 @@ void recv(MPI_Comm comm, patch_data &pd, patch_force &pf, int src, int tag)
 void near(const std::vector<patch> &p, double nfr, std::vector<int> &nf)
 {
     long n = p.size();
+    long nn = n*n;
 
-    nf.resize(n*n);
+    nf.resize(nn,1);
+    int *pnf = nf.data();
 
+    #pragma omp target data map(from:pnf[0:nn])
+    {
     for (long j = 0; j < n; ++j)
     {
-        double cxj = (p[j].m_x[1] + p[j].m_x[0]) / 2.;
-        double cyj = (p[j].m_x[3] + p[j].m_x[2]) / 2.;
-
         for (long i = 0; i < n; ++i)
         {
-            double cxi = (p[i].m_x[1] + p[i].m_x[0]) / 2.;
-            double cyi = (p[i].m_x[3] + p[i].m_x[2]) / 2.;
+            const double *pj_x = p[j].m_x.data();
+            const double *pi_x = p[i].m_x.data();
+
+            #pragma omp target is_device_ptr(pj_x,pi_x)
+            {
+            double cxj = (pj_x[1] + pj_x[0]) / 2.;
+            double cyj = (pj_x[3] + pj_x[2]) / 2.;
+
+            double cxi = (pi_x[1] + pi_x[0]) / 2.;
+            double cyi = (pi_x[3] + pi_x[2]) / 2.;
 
             double dx = cxi - cxj;
             double dy = cyi - cyj;
 
             double r = sqrt(dx*dx + dy*dy);
 
-            nf[j*n + i] = (r < nfr ? 1 : 0);
+            pnf[j*n + i] = (r < nfr ? 1 : 0);
+            }
         }
+    }
     }
 }
 
 // --------------------------------------------------------------------------
-void forces(MPI_Comm comm, patch_data &pd, patch_force &pf, double eps, const std::vector<int> &nf)
+void forces(MPI_Comm comm, patch_data &pd, patch_force &pf,
+    double eps, const std::vector<int> &nf)
 {
     int rank = 0;
     int n_ranks = 1;
@@ -641,8 +599,7 @@ void forces(MPI_Comm comm, patch_data &pd, patch_force &pf, double eps, const st
     {
         for (int i = j + 1; i < n_ranks; ++i)
         {
-            int nreqs = 0;
-            MPI_Request reqs[4];
+            requests reqs;
 
             if (rank == i)
             {
@@ -650,14 +607,14 @@ void forces(MPI_Comm comm, patch_data &pd, patch_force &pf, double eps, const st
                 if (nf[j*n_ranks +i])
                 {
                     // near by send all data
-                    isend_mp(comm, pd, j, 3000, reqs, nreqs);
+                    isend_mp(comm, pd, j, 3000, reqs);
                 }
                 else
                 {
                     // far away send reduced representation
                     patch_data rpd;
                     reduce(pd, rpd);
-                    isend_mp(comm, rpd, j, 3000, reqs, nreqs);
+                    isend_mp(comm, rpd, j, 3000, reqs);
                 }
 
                 // receive data from j (may be reduced representation)
@@ -677,14 +634,14 @@ void forces(MPI_Comm comm, patch_data &pd, patch_force &pf, double eps, const st
                 if (nf[j*n_ranks +i])
                 {
                     // near by send all data
-                    isend_mp(comm, pd, i, 4000, reqs, nreqs);
+                    isend_mp(comm, pd, i, 4000, reqs);
                 }
                 else
                 {
                     // far away send reduced representation
                     patch_data rpd;
                     reduce(pd, rpd);
-                    isend_mp(comm, rpd, i, 4000, reqs, nreqs);
+                    isend_mp(comm, rpd, i, 4000, reqs);
                 }
 
                 // calc force on bodies in j from bodies in i
@@ -692,14 +649,15 @@ void forces(MPI_Comm comm, patch_data &pd, patch_force &pf, double eps, const st
             }
 
             // wait for sends to complete
-            MPI_Waitall(nreqs, reqs, MPI_STATUS_IGNORE);
+            MPI_Waitall(reqs.m_size, reqs.m_req, MPI_STATUS_IGNORE);
         }
     }
 }
 
 
 // --------------------------------------------------------------------------
-void append(patch_data &pdo, patch_force &pfo, const patch_data &pdi, const patch_force &pfi)
+void append(patch_data &pdo, patch_force &pfo,
+    const patch_data &pdi, const patch_force &pfi)
 {
     pdo.append(pdi);
     pfo.append(pfi);
@@ -723,7 +681,7 @@ void append(patch_data &pdo, patch_force &pfo, const patch_data &pdi, const patc
 
 
 
-
+/*
 // --------------------------------------------------------------------------
 void grow(patch &p, double amt)
 {
@@ -741,7 +699,8 @@ void shrink(patch &p, double amt)
     p.m_x[2] += amt;
     p.m_x[3] -= amt;
 }
-
+*/
+/*
 // --------------------------------------------------------------------------
 bool intersects(const patch &lp, const patch &rp)
 {
@@ -751,18 +710,20 @@ bool intersects(const patch &lp, const patch &rp)
     double hy = std::min(lp.m_x[3], rp.m_x[3]);
     return (lx <= hx) && (ly <= hy);
 }
-
+*/
+/*
 // --------------------------------------------------------------------------
 bool inside(const patch &p, double x, double y)
 {
     return (x >= p.m_x[0]) && (x < p.m_x[1]) && (y >= p.m_x[2]) && (y < p.m_x[3]);
 }
+*/
 
 /** finds the list of patch neighbors and returns them in pn. returns the
  * non-neighbor patches in pnn
- */
 // --------------------------------------------------------------------------
-void neighbors(const std::vector<patch> &patches, double ofs, std::vector<std::vector<int>> &pn, std::vector<std::vector<int>> &pnn)
+void neighbors(const std::vector<patch> &patches,
+    double ofs, std::vector<std::vector<int>> &pn, std::vector<std::vector<int>> &pnn)
 {
     std::vector<patch> smallp(patches);
 
@@ -803,7 +764,45 @@ void neighbors(const std::vector<patch> &patches, double ofs, std::vector<std::v
         }
     }
 }
+ */
 
+
+#pragma omp declare target
+// --------------------------------------------------------------------------
+void split(int dir, const double *p0_x, double *p1_x, double *p2_x)
+{
+    if (dir == 0)
+    {
+        p1_x[0] = p0_x[0];
+        p1_x[1] = (p0_x[0] + p0_x[1]) / 2.;
+        p1_x[2] = p0_x[2];
+        p1_x[3] = p0_x[3];
+
+        p2_x[0] = p1_x[1];
+        p2_x[1] = p0_x[1];
+        p2_x[2] = p0_x[2];
+        p2_x[3] = p0_x[3];
+    }
+    else
+    {
+        p1_x[0] = p0_x[0];
+        p1_x[1] = p0_x[1];
+        p1_x[2] = p0_x[2];
+        p1_x[3] = (p0_x[2] + p0_x[3]) / 2.;
+
+        p2_x[0] = p0_x[0];
+        p2_x[1] = p0_x[1];
+        p2_x[2] = p1_x[3];
+        p2_x[3] = p0_x[3];
+    }
+}
+
+// --------------------------------------------------------------------------
+int inside(const double *p, double x, double y)
+{
+    return (x >= p[0]) && (x < p[1]) && (y >= p[2]) && (y < p[3]);
+}
+#pragma omp end declare target
 
 // --------------------------------------------------------------------------
 void split(int dir, const patch &p0, patch &p1, patch &p2)
@@ -811,57 +810,58 @@ void split(int dir, const patch &p0, patch &p1, patch &p2)
     p1.m_owner = p0.m_owner;
     p2.m_owner = p0.m_owner;
 
-    if (dir == 0)
-    {
-        p1.m_x[0] = p0.m_x[0];
-        p1.m_x[1] = (p0.m_x[0] + p0.m_x[1]) / 2.;
-        p1.m_x[2] = p0.m_x[2];
-        p1.m_x[3] = p0.m_x[3];
+    const double *p0_x = p0.m_x.data();
+    double *p1_x = p1.m_x.data();
+    double *p2_x = p2.m_x.data();
 
-        p2.m_x[0] = p1.m_x[1];
-        p2.m_x[1] = p0.m_x[1];
-        p2.m_x[2] = p0.m_x[2];
-        p2.m_x[3] = p0.m_x[3];
-    }
-    else
+    #pragma omp target is_device_ptr(p0_x,p1_x,p2_x)
     {
-        p1.m_x[0] = p0.m_x[0];
-        p1.m_x[1] = p0.m_x[1];
-        p1.m_x[2] = p0.m_x[2];
-        p1.m_x[3] = (p0.m_x[2] + p0.m_x[3]) / 2.;
-
-        p2.m_x[0] = p0.m_x[0];
-        p2.m_x[1] = p0.m_x[1];
-        p2.m_x[2] = p1.m_x[3];
-        p2.m_x[3] = p0.m_x[3];
+    split(dir, p0_x, p1_x, p2_x);
     }
 }
 
 // --------------------------------------------------------------------------
-void area(const std::vector<patch> &p, std::vector<double> &area)
+void area(const patch &dom, const std::vector<patch> &p, hamr::buffer<double> &area)
 {
-    double mxa = 0.0;
     long n = p.size();
+
     area.resize(n);
+    double *pa = area.data();
+
+    const double *dom_x = dom.m_x.data();
+
+    // compute the total area
+    double atot;
+    #pragma omp target enter data map(alloc:atot)
+    #pragma omp target map(alloc:atot)
+    {
+    atot = (dom_x[1] - dom_x[0]) * (dom_x[3] - dom_x[2]);
+    }
+
+    // compute fraction of the area covered by the patch
     for (long i = 0; i < n; ++i)
     {
         const patch &pi = p[i];
-        double a = (pi.m_x[1] - pi.m_x[0]) * (pi.m_x[3] - pi.m_x[2]);
-        mxa = std::max(mxa, a);
-        area[i] = a;
+        const double *pi_x = pi.m_x.data();
+
+        #pragma omp target map(alloc:atot), is_device_ptr(pa,pi_x,dom_x)
+        {
+        pa[i] = (pi_x[1] - pi_x[0]) * (pi_x[3] - pi_x[2]) / atot;
+        }
     }
 
-    for (long i = 0; i < n; ++i)
-    {
-        area[i] /= mxa;
-    }
+    #pragma omp target exit data map(release:atot)
 }
 
 // --------------------------------------------------------------------------
 std::ostream &operator<<(std::ostream &os, const patch &p)
 {
-    os << "{" << p.m_owner << " [" << p.m_x[0] << ", " << p.m_x[1] << ", "
-        << p.m_x[2] << ", " << p.m_x[3] << "]}";
+    auto spx = p.m_x.get_cpu_accessible();
+    const double *px = spx.get();
+
+    os << "{" << p.m_owner << " [" << px[0] << ", " << px[1] << ", "
+        << px[2] << ", " << px[3] << "]}";
+
     return os;
 }
 
@@ -900,7 +900,7 @@ std::ostream &operator<<(std::ostream &os, const std::vector<std::vector<T>> &v)
 }
 
 // --------------------------------------------------------------------------
-std::vector<patch> partiton(const patch &dom, size_t n_out)
+std::vector<patch> partition(const patch &dom, size_t n_out)
 {
     std::deque<patch> patches;
     patches.push_back(dom);
@@ -940,48 +940,144 @@ void assign_patches(std::vector<patch> &p, int n_ranks)
     }
 }
 
+
+
 // --------------------------------------------------------------------------
-void initialize_random(MPI_Comm comm, long n, const patch &p, double m0, double m1, double v0, double v1, patch_data &pd)
+void initialize_random(MPI_Comm comm, long n, const patch &dom,
+    const patch &p, double m0, double m1, double v0, double v1,
+    patch_data &pd)
 {
+    const double *d_x = dom.m_x.data();
+    const double *p_x = p.m_x.data();
+
+    #pragma omp target map(tofrom:n), is_device_ptr(d_x,p_x)
+    {
+    // the fraction of total area covered by this patch
+    double afrac = ((p_x[1] - p_x[0]) * (p_x[3] - p_x[2])) / ((d_x[1] - d_x[0]) * (d_x[3] - d_x[2]));
+    // adjust the number of particles
+    n *= afrac;
+    n = (n < 1 ? 1 : n);
+    }
+
     int rank = 0;
     MPI_Comm_rank(comm, &rank);
 
     std::mt19937 gen(rank);
     std::uniform_real_distribution<double> dist(0.,1.);
 
-    pd.resize(n);
+    std::vector<double> rm(n);
+    std::vector<double> rx(n);
+    std::vector<double> ry(n);
+    std::vector<double> rv(n);
 
-    double dx = p.m_x[1] - p.m_x[0];
-    double dy = p.m_x[3] - p.m_x[2];
-    double dm = m1 - m0;
-    double dv = v1 - v0;
+    double *prm = rm.data();
+    double *prx = rx.data();
+    double *pry = ry.data();
+    double *prv = rv.data();
 
     for (long i = 0; i < n; ++i)
     {
-        double x = dx * std::max(0., std::min(1., dist(gen))) + p.m_x[0];
-        double y = dy * std::max(0., std::min(1., dist(gen))) + p.m_x[2];
-        double r = sqrt(x*x + y*y);
-        double m = dm * std::max(0., std::min(1., dist(gen))) + m0;
-        double v = dv * std::max(0., std::min(1., dist(gen))) + v0;
-
-        pd.m_x[i] = x;
-        pd.m_y[i] = y;
-        pd.m_m[i] = m;
-        pd.m_u[i] = v*(-y - .1*x) / r;
-        pd.m_v[i] = v*( x - .1*y) / r;
+        prm[i] = std::max(0., std::min(1., dist(gen)));
+        prx[i] = std::max(0., std::min(1., dist(gen)));
+        pry[i] = std::max(0., std::min(1., dist(gen)));
+        prv[i] = std::max(0., std::min(1., dist(gen)));
     }
 
+    pd.resize(n);
+    double *pd_m = pd.m_m.data();
+    double *pd_x = pd.m_x.data();
+    double *pd_y = pd.m_y.data();
+    double *pd_u = pd.m_u.data();
+    double *pd_v = pd.m_v.data();
+
+    #pragma omp target teams distribute parallel for is_device_ptr(p_x,pd_m,pd_x,pd_y,pd_u,pd_v), map(to:prm[0:n],prx[0:n],pry[0:n],prv[0:n])
+    for (long i = 0; i < n; ++i)
+    {
+        double dm = m1 - m0;
+        double dx = p_x[1] - p_x[0];
+        double dy = p_x[3] - p_x[2];
+        double dv = v1 - v0;
+
+        double m = dm * prm[i] + m0;
+        double x = dx * prx[i] + p_x[0];
+        double y = dy * pry[i] + p_x[2];
+        double v = dv * prv[i] + v0;
+
+        pd_x[i] = x;
+        pd_y[i] = y;
+        pd_m[i] = m;
+
+        double r = sqrt(x*x + y*y);
+        pd_u[i] = v*(-y - .1*x) / r;
+        pd_v[i] = v*( x - .1*y) / r;
+    }
+
+    #pragma omp target is_device_ptr(pd_m,pd_x,pd_y,pd_u,pd_v)
     if (rank == 0)
     {
-        pd.m_x[0] = 0.;
-        pd.m_y[0] = 0.;
-        pd.m_m[0] = 1.989e30;
-        pd.m_u[0] = 0.;
-        pd.m_v[0] = 0.;
+        pd_x[0] = 0.;
+        pd_y[0] = 0.;
+        pd_m[0] = 1.989e30;
+        pd_u[0] = 0.;
+        pd_v[0] = 0.;
     }
 }
 
-/** identifes bodies inside the given patch */
+// --------------------------------------------------------------------------
+void partition(MPI_Comm comm, const std::vector<patch> &ps,
+    const patch_data &pd, hamr::buffer<int> &dest)
+{
+    int rank = 0;
+    int n_ranks = 1;
+
+    MPI_Comm_rank(comm, &rank);
+    MPI_Comm_size(comm, &n_ranks);
+
+    long n = pd.size();
+
+    // allocate space for the result
+    dest.resize(n);
+    int *pdest = dest.data();
+
+    // initialize to out of bounds. if a particle is not inside any patch
+    // it will be removed from the simulation
+    #pragma omp target teams distribute parallel for is_device_ptr(pdest)
+    for (long i = 0; i < n; ++i)
+    {
+        pdest[i] = -1;
+    }
+
+    // assign each body a destination
+    // work patch by patch. this is inefficient since most of the time a
+    // particle will stay in place. however this is far easier to implement on
+    // the GPU, than working body by body, testing local patch first, and
+    // falling back to neighgbors, and then to the rest.
+    const double *pd_x = pd.m_x.data();
+    const double *pd_y = pd.m_y.data();
+
+    long nps = ps.size();
+    for (long j = 0; j < nps; ++j)
+    {
+        // get the patch corners
+        const double *p_x = ps[j].m_x.data();
+
+        // test each body to see if it's inside this patch
+        #pragma omp target teams distribute parallel for is_device_ptr(pd_x,pd_y,p_x,pdest)
+        for (long i = 0; i < n; ++i)
+        {
+            if ((pdest[i] < 0) &&
+               (pd_x[i] >= p_x[0]) && (pd_x[i] < p_x[1]) &&
+               (pd_y[i] >= p_x[2]) && (pd_y[i] < p_x[3]))
+            {
+                pdest[i] = j;
+            }
+        }
+    }
+}
+
+/* this is the more efficient CPU implementation that works body by body
+
+/// identifes bodies inside the given patch
 // --------------------------------------------------------------------------
 void inside(const patch &p, const patch_data &pd, std::vector<int> &in)
 {
@@ -993,9 +1089,10 @@ void inside(const patch &p, const patch_data &pd, std::vector<int> &in)
         in[i] = (inside(p, pd.m_x[i], pd.m_y[i])) ? 1 : 0;
     }
 }
-
 // --------------------------------------------------------------------------
-void partition(MPI_Comm comm, const patch &dom, const std::vector<patch> &ps, const std::vector<std::vector<int>> &pn, const std::vector<std::vector<int>> &pnn, const patch_data &pd, std::vector<int> &dest)
+void partition(MPI_Comm comm, const patch &dom, const std::vector<patch> &ps,
+    const std::vector<std::vector<int>> &pn, const std::vector<std::vector<int>> &pnn,
+    const patch_data &pd, std::vector<int> &dest)
 {
     int rank = 0;
     int n_ranks = 1;
@@ -1006,7 +1103,6 @@ void partition(MPI_Comm comm, const patch &dom, const std::vector<patch> &ps, co
     // assign each body a destination
     long n = pd.size();
     dest.resize(n);
-
     for (long i = 0; i < n; ++i)
     {
         // find the patch containing this body. in the case that the body lies
@@ -1062,16 +1158,43 @@ void partition(MPI_Comm comm, const patch &dom, const std::vector<patch> &ps, co
             }
         }
     }
-
 }
 
+// CPU version
 // --------------------------------------------------------------------------
-void package(const patch_data &pdi, const patch_force &pfi, const std::vector<int> &dest, int rank, patch_data &pdo, patch_force &pfo)
+void stream_compact(const patch_data &pdi, const patch_force &pfi,
+    const std::vector<long> &ids, const std::vector<int> &mask,
+    patch_data &pdo, patch_force &pfo)
+{
+    long ni = pdi.size();
+    for (long i = 0; i < ni; ++i)
+    {
+        if (mask[i])
+        {
+            long q = ids[i];
+
+            pdo.m_x[q] = pdi.m_x[i];
+            pdo.m_y[q] = pdi.m_y[i];
+            pdo.m_m[q] = pdi.m_m[i];
+            pdo.m_u[q] = pdi.m_u[i];
+            pdo.m_v[q] = pdi.m_v[i];
+
+            pfo.m_u[q] = pfi.m_u[i];
+            pfo.m_v[q] = pfi.m_v[i];
+        }
+    }
+}
+
+
+// CPU implementation
+// --------------------------------------------------------------------------
+void package(const patch_data &pdi, const patch_force &pfi,
+    const std::vector<int> &dest, int rank, patch_data &pdo, patch_force &pfo)
 {
     long ni = pdi.size();
 
-    std::vector<int> mask;
-    std::vector<long> ids;
+    std::vector<int> mask; // set to 1 if the body should be coppied
+    std::vector<long> ids; // the destination index of the copy
 
     ids.resize(ni);
     mask.resize(ni);
@@ -1093,11 +1216,49 @@ void package(const patch_data &pdi, const patch_force &pfi, const std::vector<in
     pdo.resize(no);
     pfo.resize(no);
 
-    copy(pdi, pfi, ids, mask, pdo, pfo);
+    stream_compact(pdi, pfi, ids, mask, pdo, pfo);
 }
+    */
 
 // --------------------------------------------------------------------------
-void move(MPI_Comm comm, patch_data &pd, patch_force &pf, const std::vector<int> &dest)
+void package(const patch_data &pdi, const patch_force &pfi,
+    const hamr::buffer<int> &dest, int rank, patch_data &pdo, patch_force &pfo)
+{
+    long ni = pdi.size();
+
+    hamr::buffer<int> mask(def_alloc, ni, 0);
+    int *pmask = mask.data();
+
+    const int *pdest = dest.data();
+
+    // ideintify the bodies that are owned by the specified rank
+    #pragma omp target teams distribute parallel for is_device_ptr(pmask,pdest)
+    for (long i = 0; i < ni; ++i)
+    {
+        pmask[i] = (pdest[i] == rank ? 1 : 0);
+    }
+
+    // allocate enough space to package all, adjust to actual size later
+    pdo.resize(ni);
+    pfo.resize(ni);
+
+    // copy them
+    int no = 0;
+    int threads_per_block = 512;
+    cuda::stream_compact(pdo.m_m.data(), pdo.m_x.data(), pdo.m_y.data(),
+        pdo.m_u.data(), pdo.m_v.data(), pfo.m_u.data(), pfo.m_v.data(), no,
+        pdi.m_m.data(), pdi.m_x.data(), pdi.m_y.data(), pdi.m_u.data(),
+        pdi.m_v.data(), pfi.m_u.data(), pfi.m_v.data(), pmask, ni,
+        threads_per_block);
+
+    // adjust size to reflect contents
+    pdo.resize(no);
+    pfo.resize(no);
+}
+
+
+// --------------------------------------------------------------------------
+void move(MPI_Comm comm, patch_data &pd, patch_force &pf, const hamr::buffer<int> &dest)
 {
     int rank = 0;
     int n_ranks = 1;
@@ -1116,8 +1277,7 @@ void move(MPI_Comm comm, patch_data &pd, patch_force &pf, const std::vector<int>
     {
         for (int i = j + 1; i < n_ranks; ++i)
         {
-            int nreqs = 0;
-            MPI_Request reqs[8];
+            requests reqs;
 
             if (rank == i)
             {
@@ -1125,7 +1285,7 @@ void move(MPI_Comm comm, patch_data &pd, patch_force &pf, const std::vector<int>
                 patch_data pdi;
                 patch_force pfi;
                 package(pd, pf, dest, j, pdi, pfi);
-                isend(comm, pdi, pfi, j, 5000, reqs, nreqs);
+                isend(comm, pdi, pfi, j, 5000, reqs);
 
                 // receive data from j
                 patch_data pdj;
@@ -1146,14 +1306,14 @@ void move(MPI_Comm comm, patch_data &pd, patch_force &pf, const std::vector<int>
                 patch_data pdj;
                 patch_force pfj;
                 package(pd, pf, dest, i, pdj, pfj);
-                isend(comm, pdj, pfj, i, 6000, reqs, nreqs);
+                isend(comm, pdj, pfj, i, 6000, reqs);
 
                 // add to the output
                 append(pdo, pfo, pdi, pfi);
             }
 
             // wait for sends to complete
-            MPI_Waitall(nreqs, reqs, MPI_STATUS_IGNORE);
+            MPI_Waitall(reqs.m_size, reqs.m_req, MPI_STATUS_IGNORE);
         }
     }
 
@@ -1199,29 +1359,42 @@ void inside(const patch &p, const patch_data &pd, std::vector<long> &iid)
  *  note: patch_forces must be pre-initialized and held in between calls.
  */
 // --------------------------------------------------------------------------
-void velocity_verlet(MPI_Comm comm, patch_data &pd, patch_force &pf, double h, double eps, const std::vector<int> &nf)
+void velocity_verlet(MPI_Comm comm,
+    patch_data &pd, patch_force &pf, double h, double eps,
+    const std::vector<int> &nf)
 {
     double h2 = h/2.;
     long n = pd.size();
+
+    double *pd_m = pd.m_m.data();
+    double *pd_x = pd.m_x.data();
+    double *pd_y = pd.m_y.data();
+    double *pd_u = pd.m_u.data();
+    double *pd_v = pd.m_v.data();
+    double *pf_u = pf.m_u.data();
+    double *pf_v = pf.m_v.data();
+
+    #pragma omp target teams distribute parallel for is_device_ptr(pd_m,pd_x,pd_y,pd_u,pd_v,pf_u,pf_v)
     for (long i = 0; i < n; ++i)
     {
         // half step velocity
-        pd.m_u[i] = pd.m_u[i] + h2 * pf.m_u[i] / pd.m_m[i];
-        pd.m_v[i] = pd.m_v[i] + h2 * pf.m_v[i] / pd.m_m[i];
+        pd_u[i] = pd_u[i] + h2 * pf_u[i] / pd_m[i];
+        pd_v[i] = pd_v[i] + h2 * pf_v[i] / pd_m[i];
 
         // full step position
-        pd.m_x[i] = pd.m_x[i] + h * pd.m_u[i];
-        pd.m_y[i] = pd.m_y[i] + h * pd.m_v[i];
+        pd_x[i] = pd_x[i] + h * pd_u[i];
+        pd_y[i] = pd_y[i] + h * pd_v[i];
     }
 
     // update the forces
     forces(comm, pd, pf, eps, nf);
 
+    #pragma omp target teams distribute parallel for is_device_ptr(pd_m,pd_u,pd_v,pf_u,pf_v)
     for (long i = 0; i < n; ++i)
     {
         // half step velocity
-        pd.m_u[i] = pd.m_u[i] + h2 * pf.m_u[i] / pd.m_m[i];
-        pd.m_v[i] = pd.m_v[i] + h2 * pf.m_v[i] / pd.m_m[i];
+        pd_u[i] = pd_u[i] + h2 * pf_u[i] / pd_m[i];
+        pd_v[i] = pd_v[i] + h2 * pf_v[i] / pd_m[i];
     }
 }
 
@@ -1247,6 +1420,22 @@ void write(MPI_Comm comm, const patch_data &pd, const patch_force &pf, const cha
     int rank = 0;
     MPI_Comm_rank(comm, &rank);
 
+    auto spd_m = pd.m_m.get_cpu_accessible();
+    auto spd_x = pd.m_x.get_cpu_accessible();
+    auto spd_y = pd.m_y.get_cpu_accessible();
+    auto spd_u = pd.m_u.get_cpu_accessible();
+    auto spd_v = pd.m_v.get_cpu_accessible();
+    auto spf_u = pf.m_u.get_cpu_accessible();
+    auto spf_v = pf.m_v.get_cpu_accessible();
+
+    const double *pd_m = spd_m.get();
+    const double *pd_x = spd_x.get();
+    const double *pd_y = spd_y.get();
+    const double *pd_u = spd_u.get();
+    const double *pd_v = spd_v.get();
+    const double *pf_u = spd_u.get();
+    const double *pf_v = spd_v.get();
+
     // package in the vtk layout
     long n = pd.size();
 
@@ -1262,15 +1451,15 @@ void write(MPI_Comm comm, const patch_data &pd, const patch_force &pf, const cha
     for (long i = 0; i < n; ++i)
     {
         long ii = 3*i;
-        x[ii    ] = pd.m_x[i];
-        x[ii + 1] = pd.m_y[i];
+        x[ii    ] = pd_x[i];
+        x[ii + 1] = pd_y[i];
         x[ii + 2] = 0.;
 
-        m[i] = pd.m_m[i];
-        vu[i] = pd.m_u[i];
-        vv[i] = pd.m_v[i];
-        fu[i] = pf.m_u[i];
-        fv[i] = pf.m_v[i];
+        m[i] = pd_m[i];
+        vu[i] = pd_u[i];
+        vv[i] = pd_v[i];
+        fu[i] = pf_u[i];
+        fv[i] = pf_v[i];
         r[i] = rank;
 
         ii = 2*i;
@@ -1387,24 +1576,27 @@ void write(MPI_Comm comm, const std::vector<patch> &patches, const char *dir)
     {
         const patch &pi = patches[i];
 
+        auto spi_x = pi.m_x.get_cpu_accessible();
+        const double *pi_x = spi_x.get();
+
         long ii = 12*i;
-        x[ii    ] = pi.m_x[0];
-        x[ii + 1] = pi.m_x[2];
+        x[ii    ] = pi_x[0];
+        x[ii + 1] = pi_x[2];
         x[ii + 2] = 0.;
 
         ii += 3;
-        x[ii    ] = pi.m_x[1];
-        x[ii + 1] = pi.m_x[2];
+        x[ii    ] = pi_x[1];
+        x[ii + 1] = pi_x[2];
         x[ii + 2] = 0.;
 
         ii += 3;
-        x[ii    ] = pi.m_x[1];
-        x[ii + 1] = pi.m_x[3];
+        x[ii    ] = pi_x[1];
+        x[ii + 1] = pi_x[3];
         x[ii + 2] = 0.;
 
         ii += 3;
-        x[ii    ] = pi.m_x[0];
-        x[ii + 1] = pi.m_x[3];
+        x[ii    ] = pi_x[0];
+        x[ii + 1] = pi_x[3];
         x[ii + 2] = 0.;
 
         ii = 5*i;
@@ -1487,14 +1679,14 @@ int main(int argc, char **argv)
     double nfr = 2.*sqrt(dx*dx + dy*dy); // / 4.;
     double eps = 0.;
     double h = 4.*24.*3600.;
-    long nb = 10;
-    long nits = 1000;
+    long nb = 100;
+    long nits = 100;
     long io_int = 10;
     const char *odir = "output";
 
     // partition space
     patch dom(0, x0, x1, y0, y1);
-    std::vector<patch> patches = partiton(dom, n_ranks);
+    std::vector<patch> patches = partition(dom, n_ranks);
 
     if (io_int)
        write(comm, patches, odir);
@@ -1503,33 +1695,12 @@ int main(int argc, char **argv)
     std::vector<int> nf;
     near(patches, nfr, nf);
 
-    // patch neighbors
-    std::vector<std::vector<int>> pn;
-    std::vector<std::vector<int>> pnn;
-    neighbors(patches, fabs(x1 - x0)/1e3, pn, pnn);
-
-    if (rank == 0)
-    {
-    std::cerr << "patches = " << patches << std::endl;
-    std::cerr << "neighbors = " << pn << std::endl;
-    std::cerr << "non-neighbors = " << pnn << std::endl;
-    }
-
     // initialize bodies
-    std::vector<double> pa;
-    area(patches, pa);
-
-    nb = std::max(1l, (long) (nb * pa[rank]));
-
     patch_data pd;
-    pd.resize(nb);
-
-    initialize_random(comm, nb, patches[rank], m0, m1, v0, v1, pd);
+    initialize_random(comm, nb, dom, patches[rank], m0, m1, v0, v1, pd);
 
     // initialize forces
     patch_force pf;
-    pf.resize(nb);
-
     forces(comm, pd, pf, eps, nf);
 
     // write initial state
@@ -1540,12 +1711,14 @@ int main(int argc, char **argv)
     long it = 0;
     while (it < nits)
     {
+        std::cerr << " === it " << it << " ===" << std::endl;
+
         // update bodies
         velocity_verlet(comm, pd, pf, h, eps, nf);
 
         // update partition
-        std::vector<int> dest;
-        partition(comm, dom, patches, pn, pnn, pd, dest);
+        hamr::buffer<int> dest(def_alloc);
+        partition(comm, patches, pd, dest);
         move(comm, pd, pf, dest);
 
         // write current state
