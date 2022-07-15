@@ -1,0 +1,15 @@
+
+
+
+
+to generate the initial condition:
+```
+galaxy_ic  2   -1. -1.  0. 0. 0.5 0.25 0.      0.1 1.035 0 16 128 2048 4. 4. 100 1000 1. \
+                1. -1.  0. 0. 0.5 0.25 3.1415  0.1 1.035 0 16 128 2048 4. -4. 100 1000 1. \
+                8 ./ic
+```
+
+to plot the initial condition:
+```
+./plot_ic ./ic > ic.py; python3 ic.py
+```
