@@ -176,12 +176,11 @@ void spiral(double cx, double cy,
             mo[qq] = m0 + dm * std::max(0., std::min(1., udist(gen)));
             xo[qq] = -1. * ( x + w * ndist(gen) );
             yo[qq] = -1. * ( y + w * ndist(gen) );
-            uo[qq] = -1. * ( v0 * u )  + vx;
-            vo[qq] = -1. * ( v0 * v )  + vy;
+            uo[qq] = -1. * ( v0 * u * rr ) + vx;
+            vo[qq] = -1. * ( v0 * v * rr ) + vy;
             co[qq] = 1.;
         }
     }
-
 
     // position
     // rotate
@@ -475,6 +474,13 @@ int main(int argc, char **argv)
         v.insert(v.end(), tv.begin(), tv.end());
         c.insert(c.end(), tc.begin(), tc.end());
     }
+
+    // add a large mass in the center
+    m.push_back(1.e36);
+    x.push_back(0.);
+    y.push_back(0.);
+    u.push_back(0.);
+    v.push_back(0.);
 
     // partition the domain
     int n_parts = atoi(argv[++q]);
