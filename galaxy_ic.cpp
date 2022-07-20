@@ -149,10 +149,13 @@ void spiral(double cx, double cy,
         // tangent to spiral
         double u = y + k * x;
         double v = -x + k * y;
-        double muv = sqrt( u*u + v*v );
 
+        double muv = sqrt( u*u + v*v );
         u /= muv;
         v /= muv;
+
+        // differential rotation, rr = 1. rigid rotation rr = r;
+        double rr = r;
 
         // upper branch
         for (long i = 0; i < nps; ++i)
@@ -161,8 +164,8 @@ void spiral(double cx, double cy,
             mo[qq] = m0 + dm * std::max(0., std::min(1., udist(gen)));
             xo[qq] = ( x + w * ndist(gen) );
             yo[qq] = ( y + w * ndist(gen) );
-            uo[qq] = ( v0 * u + vx );
-            vo[qq] = ( v0 * v + vy );
+            uo[qq] = ( v0 * u * rr + vx );
+            vo[qq] = ( v0 * v * rr + vy );
             co[qq] = 0.;
         }
 
@@ -234,16 +237,16 @@ void spiral(double cx, double cy,
     double sy = y0 < 0 ? -1. : 1.;
     for (long i = 0; i < nt; ++i)
     {
-        uo[i] *= sx*v0;
-        vo[i] *= sy*v0;
+        uo[i] *= sx;
+        vo[i] *= sy;
     }
 
     // translate
-    for (long i = 0; i < nt; ++i)
+    /*for (long i = 0; i < nt; ++i)
     {
         uo[i] += vx;
         vo[i] += vy;
-    }
+    }*/
 }
 
 // --------------------------------------------------------------------------
