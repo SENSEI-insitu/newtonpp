@@ -3,9 +3,7 @@
 
 namespace cuda
 {
-/** streamCompact
- *
- * The algorithm is implemented using the 2-pass scan algorithm, counting the
+/** The algorithm is implemented using the 2-pass scan algorithm, counting the
  * true predicates with a reduction pass; scanning the predicates; then passing
  * over the data again, evaluating the predicates again and using the scanned
  * predicate values as indices to write the output for which the predicate is
@@ -27,5 +25,17 @@ int stream_compact( double *pdo_m, double *pdo_x, double *pdo_y,
     const double *pfi_u, const double *pfi_v, const int *mask,
     size_t N, int b );
 }
+
+namespace cpu
+{
+
+int stream_compact( double *pdo_m, double *pdo_x, double *pdo_y,
+    double *pdo_u, double *pdo_v, double *pfo_u, double *pfo_v,
+    int &outCount, const double *pdi_m, const double *pdi_x,
+    const double *pdi_y, const double *pdi_u, const double *pdi_v,
+    const double *pfi_u, const double *pfi_v, const int *mask,
+    size_t N );
+}
+
 
 #endif

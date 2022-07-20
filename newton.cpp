@@ -7,10 +7,19 @@
 #include <math.h>
 #include <deque>
 #include <cstring>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
+#include <chrono>
+using namespace std::literals;
+using timer = std::chrono::high_resolution_clock;
+
+// this activates the cuda optimized stream compaction
+#define ENABLE_CUDA
 
 #include "stream_compact.h"
 #include "hamr_buffer.h"
-
 
 hamr::buffer_allocator cpu_alloc = hamr::buffer_allocator::malloc;
 hamr::buffer_allocator gpu_alloc = hamr::buffer_allocator::openmp;
@@ -66,7 +75,9 @@ struct patch_data
     patch_data() : m_m(def_alloc), m_x(def_alloc),
         m_y(def_alloc), m_u(def_alloc), m_v(def_alloc)
     {
+        #ifdef DEBUG
         std::cerr << "patch_data::patch_data " << this << std::endl;
+        #endif
     }
 
     patch_data(const patch_data&) = delete;
@@ -92,13 +103,17 @@ struct patch_data
 // --------------------------------------------------------------------------
 patch_data::~patch_data()
 {
+    #ifdef DEBUG
     std::cerr << "patch_data::~patch_data " << this << std::endl;
+    #endif
 }
 
 // --------------------------------------------------------------------------
 void patch_data::operator=(const patch_data &pd)
 {
+    #ifdef DEBUG
     std::cerr << "patch_data::operator= " << this << " <-- " << &pd << std::endl;
+    #endif
 
     m_m.assign(pd.m_m);
     m_x.assign(pd.m_x);
@@ -110,7 +125,9 @@ void patch_data::operator=(const patch_data &pd)
 // --------------------------------------------------------------------------
 void patch_data::operator=(patch_data &&pd)
 {
+    #ifdef DEBUG
     std::cerr << "patch_data::operator= && " << this << " <-- " << &pd << std::endl;
+    #endif
 
     m_m = std::move(pd.m_m);
     m_x = std::move(pd.m_x);
@@ -122,7 +139,9 @@ void patch_data::operator=(patch_data &&pd)
 // --------------------------------------------------------------------------
 void patch_data::resize(long n)
 {
+    #ifdef DEBUG
     std::cerr << "patch_data::resize " << this << std::endl;
+    #endif
 
     m_m.resize(n);
     m_x.resize(n);
@@ -134,13 +153,15 @@ void patch_data::resize(long n)
 // --------------------------------------------------------------------------
 void patch_data::append(const patch_data &o)
 {
+    #ifdef DEBUG
     std::cerr << "patch_data::append " << this << std::endl;
+    #endif
 
     m_m.append(o.m_m);
-    m_m.append(o.m_x);
-    m_m.append(o.m_y);
-    m_m.append(o.m_u);
-    m_m.append(o.m_v);
+    m_x.append(o.m_x);
+    m_y.append(o.m_y);
+    m_u.append(o.m_u);
+    m_v.append(o.m_v);
 }
 
 // --------------------------------------------------------------------------
@@ -241,7 +262,9 @@ struct patch_force
 {
     patch_force() : m_u(def_alloc), m_v(def_alloc)
     {
+        #ifdef DEBUG
         std::cerr << "patch_force::patch_force " << this << std::endl;
+        #endif
     }
 
     patch_force(const patch_force&) = delete;
@@ -264,13 +287,17 @@ struct patch_force
 // --------------------------------------------------------------------------
 patch_force::~patch_force()
 {
+    #ifdef DEBUG
     std::cerr << "patch_force::~patch_force " << this << std::endl;
+    #endif
 }
 
 // --------------------------------------------------------------------------
 void patch_force::operator=(const patch_force &pd)
 {
+    #ifdef DEBUG
     std::cerr << "patch_force::operator= " << this << " <-- " << &pd << std::endl;
+    #endif
 
     m_u.assign(pd.m_u);
     m_v.assign(pd.m_v);
@@ -279,7 +306,9 @@ void patch_force::operator=(const patch_force &pd)
 // --------------------------------------------------------------------------
 void patch_force::operator=(patch_force &&pd)
 {
+    #ifdef DEBUG
     std::cerr << "patch_force::operator=&& " << this << " <-- " << &pd << std::endl;
+    #endif
 
     m_u = std::move(pd.m_u);
     m_v = std::move(pd.m_v);
@@ -288,7 +317,9 @@ void patch_force::operator=(patch_force &&pd)
 // --------------------------------------------------------------------------
 void patch_force::resize(long n)
 {
+    #ifdef DEBUG
     std::cerr << "patch_force::resize " << this << std::endl;
+    #endif
 
     m_u.resize(n);
     m_v.resize(n);
@@ -297,7 +328,9 @@ void patch_force::resize(long n)
 // --------------------------------------------------------------------------
 void patch_force::append(const patch_force &o)
 {
+    #ifdef DEBUG
     std::cerr << "patch_force::append " << this << std::endl;
+    #endif
 
     m_u.append(o.m_u);
     m_v.append(o.m_v);
@@ -425,7 +458,7 @@ void forces(const patch_data &lpd, const patch_data &rpd, patch_force &pf, doubl
         }
     }
 
-    #pragma omp target exit data map(release: eps2,m,n,fx,fy)
+    #pragma omp target exit data map(release: fx,fy)
 }
 
 
@@ -1244,12 +1277,20 @@ void package(const patch_data &pdi, const patch_force &pfi,
 
     // copy them
     int no = 0;
+
+#if defined(ENABLE_CUDA)
     int threads_per_block = 512;
     cuda::stream_compact(pdo.m_m.data(), pdo.m_x.data(), pdo.m_y.data(),
         pdo.m_u.data(), pdo.m_v.data(), pfo.m_u.data(), pfo.m_v.data(), no,
         pdi.m_m.data(), pdi.m_x.data(), pdi.m_y.data(), pdi.m_u.data(),
         pdi.m_v.data(), pfi.m_u.data(), pfi.m_v.data(), pmask, ni,
         threads_per_block);
+#else
+    cpu::stream_compact(pdo.m_m.data(), pdo.m_x.data(), pdo.m_y.data(),
+        pdo.m_u.data(), pdo.m_v.data(), pfo.m_u.data(), pfo.m_v.data(), no,
+        pdi.m_m.data(), pdi.m_x.data(), pdi.m_y.data(), pdi.m_u.data(),
+        pdi.m_v.data(), pfi.m_u.data(), pfi.m_v.data(), pmask, ni);
+#endif
 
     // adjust size to reflect contents
     pdo.resize(no);
@@ -1653,90 +1694,7 @@ void write(MPI_Comm comm, const std::vector<patch> &patches, const char *dir)
     fclose(fh);
 }
 
-
-int main(int argc, char **argv)
-{
-    MPI_Comm comm = MPI_COMM_WORLD;
-    MPI_Init(&argc, &argv);
-
-    int rank = 0;
-    int n_ranks = 1;
-
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &n_ranks);
-
-    // initial condition
-    double x0 = -5906.4e9;
-    double x1 = 5906.4e9;
-    double y0 = -5906.4e9;
-    double y1 = 5906.4e9;
-    double m0 = 10.0e24;
-    double m1 = 100.0e24;
-    double v0 = 1.0e3;
-    double v1 = 10.0e3;
-    double dx = x1 - x0;
-    double dy = y1 - y0;
-    double nfr = 2.*sqrt(dx*dx + dy*dy); // / 4.;
-    double eps = 0.;
-    double h = 4.*24.*3600.;
-    long nb = 100;
-    long nits = 100;
-    long io_int = 10;
-    const char *odir = "output";
-
-    // partition space
-    patch dom(0, x0, x1, y0, y1);
-    std::vector<patch> patches = partition(dom, n_ranks);
-
-    if (io_int)
-       write(comm, patches, odir);
-
-    // flag nearby patches
-    std::vector<int> nf;
-    near(patches, nfr, nf);
-
-    // initialize bodies
-    patch_data pd;
-    initialize_random(comm, nb, dom, patches[rank], m0, m1, v0, v1, pd);
-
-    // initialize forces
-    patch_force pf;
-    forces(comm, pd, pf, eps, nf);
-
-    // write initial state
-    if (io_int)
-       write(comm, pd, pf, odir);
-
-    // iterate
-    long it = 0;
-    while (it < nits)
-    {
-        std::cerr << " === it " << it << " ===" << std::endl;
-
-        // update bodies
-        velocity_verlet(comm, pd, pf, h, eps, nf);
-
-        // update partition
-        hamr::buffer<int> dest(def_alloc);
-        partition(comm, patches, pd, dest);
-        move(comm, pd, pf, dest);
-
-        // write current state
-        if (io_int && (((it + 1) % io_int) == 0))
-            write(comm, pd, pf, odir);
-
-        it += 1;
-    }
-
-
-    MPI_Finalize();
-
-    return 0;
-}
-
-
-/*
-/// read n elements of type T
+// --------------------------------------------------------------------------
 template <typename T>
 int readn(int fh, T *buf, size_t n)
 {
@@ -1750,152 +1708,317 @@ int readn(int fh, T *buf, size_t n)
     }
     return 0;
 }
-/// write n elements of type T
-template <typename T>
-int writen(int fh, T *buf, size_t n)
-{
-    ssize_t ierr = 0;
-    ssize_t nb = n*sizeof(T);
-    if ((ierr = write(fh, buf, nb)) != nb)
-    {
-        std::cerr << "Failed to write " << n << " elements of size "
-            << sizeof(T) << std::endl << strerror(errno) << std::endl;
-        return -1;
-    }
-    return 0;
-}
-
-/// memory for the nbody solver
-struct solver_data
-{
-public:
-    solver_data() = delete;
-
-    solver_data(int devid) :
-        m_devid(devid), m_t(0), m_dt(1), m_step(0), m_size(0), m_id(nullptr),
-        m_m(nullptr), m_x(nullptr), m_y(nullptr), m_z(nullptr), m_u(nullptr),
-        m_v(nullptr), m_uz(nullptr), m_u(nullptr), m_v(nullptr),
-        m_fz(nullptr) {}
-
-    ~solver_data();
-
-    /// load state form disk. this is how you initialize the solver
-    int load_state(const std::string &fn);
-
-    /// save the current state to disk. use to make a checkpoint.
-    int write_state(const std::string &fn);
-
-    int m_devid;    ///< device owning the data
-    double m_t;     ///< current simulated time
-    double m_dt;    ///< time step for sovler
-    long m_step;    ///< step number
-    long m_size;    ///< number of bodies
-    long *m_id;     ///< body id
-    double *m_m;    ///< body mass
-    double *m_x;    ///< body position x
-    double *m_y;    ///< body position y
-    double *m_z;    ///< body position z
-    double *m_u;   ///< body velocity x
-    double *m_v;   ///< body velocity y
-    double *m_uz;   ///< body velocity z
-    double *m_u;   ///< body force x
-    double *m_v;   ///< body force y
-    double *m_fz;   ///< body force z
-};
 
 // --------------------------------------------------------------------------
-int solver_data::load_state(const std::string &fn)
+int initialize_file(MPI_Comm comm, const std::string &idir,
+    std::vector<patch> &patches, patch_data &lpd,
+    double &h, double &eps, double &nfr)
 {
-    int h = open(fn.c_str(), O_RDONLY);
-    if (h < 0)
+    int rank = 0;
+    int n_ranks = 1;
+
+    MPI_Comm_rank(comm, &rank);
+    MPI_Comm_size(comm, &n_ranks);
+
+    // read the set of patches
+    long n_patches = 0;
+    std::vector<double> tpatches;
+    if (rank == 0)
+    {
+        // rank 0 reads and sends to all others
+        std::string fn = idir + "/patches.npp";
+        int h = open(fn.c_str(), O_RDONLY);
+        if (h < 0)
+        {
+            std::cerr << "Failed to open \"" << fn << "\"" << std::endl
+                << strerror(errno) << std::endl;
+            return -1;
+        }
+
+        if (readn(h, &n_patches, 1 ))
+        {
+            std::cerr << "Failed to read \"" << fn << "\"" << std::endl;
+            close(h);
+            return -1;
+        }
+
+        long nelem = 4*n_patches;
+        tpatches.resize(nelem);
+        if (readn(h, tpatches.data(), nelem))
+        {
+            std::cerr << "Failed to read \"" << fn << "\"" << std::endl;
+            close(h);
+            return -1;
+        }
+
+        close(h);
+
+        MPI_Bcast(&n_patches, 1, MPI_LONG, 0, comm);
+        MPI_Bcast(tpatches.data(), n_patches, MPI_DOUBLE, 0, comm);
+    }
+    else
+    {
+        // receive from rank 0
+        MPI_Bcast(&n_patches, 1, MPI_LONG, 0, comm);
+
+        tpatches.resize(4*n_patches);
+        MPI_Bcast(tpatches.data(), n_patches, MPI_DOUBLE, 0, comm);
+    }
+
+    // convert to patch structures
+    patches.resize(n_ranks);
+    for (int i = 0; i < n_ranks; ++i)
+    {
+        const double *pp = &tpatches[4*i];
+        patches[i] = patch(i, pp[0], pp[1], pp[2], pp[3]);
+    }
+
+    // check that number of ranks and patches match
+    if (n_patches != n_ranks)
+    {
+        std::cerr << "Wrong number of patches " << n_patches
+            << " for " << n_ranks << " ranks" << std::endl;
+        return -1;
+    }
+
+    // read the local patch data
+    {
+    std::string fn = idir + "/patch_data_" + std::to_string(rank) + ".npp";
+    int fh = open(fn.c_str(), O_RDONLY);
+    if (fh < 0)
     {
         std::cerr << "Failed to open \"" << fn << "\"" << std::endl
             << strerror(errno) << std::endl;
         return -1;
     }
 
-    if (readn(h, &m_t, 1 ) ||
-        readn(h, &m_dt, 1) ||
-        readn(h, &m_step, 1) ||
-        readn(h, &m_size, 1))
+    long nbod = 0;
+    if (readn(fh, &nbod, 1))
     {
         std::cerr << "Failed to read \"" << fn << "\"" << std::endl;
-        close(h);
+        close(fh);
         return -1;
     }
 
-    size_t nbytes = m_size*sizeof(double);
-    m_id = (long*)malloc(m_size*sizeof(long));
-    m_m = (double*)malloc(nbytes);
-    m_x = (double*)malloc(nbytes);
-    m_y = (double*)malloc(nbytes);
-    m_z = (double*)malloc(nbytes);
-    m_u = (double*)malloc(nbytes);
-    m_v = (double*)malloc(nbytes);
-    m_uz = (double*)malloc(nbytes);
-    m_u = (double*)malloc(nbytes);
-    m_v = (double*)malloc(nbytes);
-    m_fz = (double*)malloc(nbytes);
-
-
-    if (readn(h, m_id, m_size) ||
-        readn(h, m_m, m_size) ||
-        readn(h, m_x, m_size) ||
-        readn(h, m_y, m_size) ||
-        readn(h, m_z, m_size) ||
-        readn(h, m_u, m_size) ||
-        readn(h, m_v, m_size) ||
-        readn(h, m_uz, m_size) ||
-        readn(h, m_u, m_size) ||
-        readn(h, m_v, m_size) ||
-        readn(h, m_fz, m_size))
+    if (nbod)
     {
-        std::cerr << "Failed to read \"" << fn << "\"" << std::endl;
-        close(h);
-        return -1;
+        hamr::buffer<double> tm(cpu_alloc, nbod);
+        hamr::buffer<double> tx(cpu_alloc, nbod);
+        hamr::buffer<double> ty(cpu_alloc, nbod);
+        hamr::buffer<double> tu(cpu_alloc, nbod);
+        hamr::buffer<double> tv(cpu_alloc, nbod);
+
+        if (readn(fh, tm.data(), nbod) ||
+            readn(fh, tx.data(), nbod) || readn(fh, ty.data(), nbod) ||
+            readn(fh, tu.data(), nbod) || readn(fh, tv.data(), nbod))
+        {
+            std::cerr << "Failed to read \"" << fn << "\"" << std::endl;
+            close(fh);
+            return -1;
+        }
+
+        lpd.m_m = std::move(tm);
+        lpd.m_x = std::move(tx);
+        lpd.m_y = std::move(ty);
+        lpd.m_u = std::move(tu);
+        lpd.m_v = std::move(tv);
+    }
     }
 
-    close(h);
+    // read parameters
+    if (rank == 0)
+    {
+        std::string fn = idir + "/params.npp";
+        FILE *fh = nullptr;
+
+        if ((fh = fopen(fn.c_str(),"r")) == nullptr)
+        {
+            std::cerr << "Failed to open \"" << fn << "\"" << std::endl
+                << strerror(errno) << std::endl;
+        }
+
+       if (fscanf(fh, "h = %lf, eps = %lf, nfr = %lf", &h, &eps, &nfr) != 3)
+       {
+           fclose(fh);
+           std::cerr << "Failed to read h, eps, nfr from file " << fn << std::endl;
+           return -1;
+       }
+
+       fclose(fh);
+    }
+
+    MPI_Bcast(&h, 1, MPI_DOUBLE, 0, comm);
+    MPI_Bcast(&eps, 1, MPI_DOUBLE, 0, comm);
+    MPI_Bcast(&nfr, 1, MPI_DOUBLE, 0, comm);
+
+   return 0;
+}
+
+// --------------------------------------------------------------------------
+int initialize_random(MPI_Comm comm,
+    std::vector<patch> &patches, patch_data &lpd,
+    double &h, double &eps, double &nfr)
+{
+    int rank = 0;
+    int n_ranks = 1;
+
+    MPI_Comm_rank(comm, &rank);
+    MPI_Comm_size(comm, &n_ranks);
+
+    // initial condition
+    long nb = 100;
+
+    double x0 = -5906.4e9;
+    double x1 = 5906.4e9;
+    double y0 = -5906.4e9;
+    double y1 = 5906.4e9;
+
+    double m0 = 10.0e24;
+    double m1 = 100.0e24;
+
+    double v0 = 1.0e3;
+    double v1 = 10.0e3;
+
+    h = 4.*24.*3600.;
+    eps = 0.;
+
+    double dx = x1 - x0;
+    double dy = y1 - y0;
+    nfr = 2.*sqrt(dx*dx + dy*dy);
+
+    // partition space
+    patch dom(0, x0, x1, y0, y1);
+    patches = partition(dom, n_ranks);
+
+    // initialize bodies
+    initialize_random(comm, nb, dom, patches[rank], m0, m1, v0, v1, lpd);
+
     return 0;
 }
 
 // --------------------------------------------------------------------------
-int solver_data::save_state(const std::string &fn)
+int initialize(MPI_Comm comm, const std::string &idir,
+    std::vector<patch> &patches, patch_data &lpd,
+    double &h, double &eps, double &nfr)
 {
-    int h = open(fn.c_str(), O_WRONLY|O_CREAT);
-    if (h < 0)
-    {
-        std::cerr << "Failed to open \"" << fn << "\"" << std::endl
-            << strerror(errno) << std::endl;
+    int rank = 0;
+    MPI_Comm_rank(comm, &rank);
+
+#if defined(DEBUG_IC)
+    initialize_random(comm, patches, lpd, h, eps, nfr);
+#else
+    if (initialize_file(comm, idir, patches, lpd, h, eps, nfr))
         return -1;
+#endif
+
+    long lnb = lpd.size();
+    long tnb = 0;
+    MPI_Reduce(&lnb, &tnb, 1, MPI_LONG, MPI_SUM, 0, comm);
+
+    if (rank == 0)
+    {
+        std::cerr << "initialized " << tnb << " bodies on " << patches.size()
+            << " patches. h=" << h << " eps=" << eps << " nfr=" << nfr << std::endl;
     }
 
-    if (writen(h, &m_t, 1 ) ||
-        writen(h, &m_dt, 1) ||
-        writen(h, &m_step, 1) ||
-        writen(h, &m_size, 1) ||
-        writen(h, m_id, m_size) ||
-        writen(h, m_m, m_size) ||
-        writen(h, m_x, m_size) ||
-        writen(h, m_y, m_size) ||
-        writen(h, m_z, m_size) ||
-        writen(h, m_u, m_size) ||
-        writen(h, m_v, m_size) ||
-        writen(h, m_uz, m_size) ||
-        writen(h, m_u, m_size) ||
-        writen(h, m_v, m_size) ||
-        writen(h, m_fz, m_size))
-    {
-        std::cerr << "Failed to write \"" << fn << "\"" << std::endl;
-        close(h);
-        return -1;
-    }
-
-    close(h);
     return 0;
 }
 
 
 
 
-*/
+
+
+int main(int argc, char **argv)
+{
+    auto start_time = timer::now();
+
+    MPI_Comm comm = MPI_COMM_WORLD;
+    MPI_Init(&argc, &argv);
+
+    int rank = 0;
+    int n_ranks = 1;
+
+    MPI_Comm_rank(comm, &rank);
+    MPI_Comm_size(comm, &n_ranks);
+
+    // parse the command line
+    if (argc != 5)
+    {
+        std::cerr << "usage:" << std::endl
+            << "newtonpp [in dir] [out dir] [n its] [io int]" << std::endl;
+        return -1;
+    }
+
+    int q = 0;
+    const char *idir = argv[++q];
+    const char *odir = argv[++q];
+
+    long nits = atoi(argv[++q]);
+    long io_int = atoi(argv[++q]);
+
+    double h = 0.;   // time step size
+    double nfr = 0.; // distance for reduced representation
+    double eps = 0.; // softener
+
+    // load the initial condition and initialize the bodies
+    patch_data pd;
+    std::vector<patch> patches;
+
+    if (initialize(comm, idir, patches, pd, h, eps, nfr))
+        return -1;
+
+    // write the domain decomp
+    if (io_int)
+        write(comm, patches, odir);
+
+    // flag nearby patches
+    std::vector<int> nf;
+    near(patches, nfr, nf);
+
+    // initialize forces
+    patch_force pf;
+    forces(comm, pd, pf, eps, nf);
+
+    // write initial state
+    if (io_int)
+       write(comm, pd, pf, odir);
+
+    if (rank == 0)
+        std::cerr << " === init " << (timer::now() - start_time) / 1s << "s" << std::endl;
+
+    // iterate
+    long it = 0;
+    while (it < nits)
+    {
+        auto it_time  = timer::now();
+
+        // update bodies
+        velocity_verlet(comm, pd, pf, h, eps, nf);
+
+        // update partition
+        if (n_ranks > 1)
+        {
+            hamr::buffer<int> dest(def_alloc);
+            partition(comm, patches, pd, dest);
+            move(comm, pd, pf, dest);
+        }
+
+        // write current state
+        if (io_int && (((it + 1) % io_int) == 0))
+            write(comm, pd, pf, odir);
+
+        it += 1;
+
+        if (rank == 0)
+            std::cerr << " === it " << it << " : " << (timer::now() - it_time) / 1s << "s" << std::endl;
+
+    }
+
+    MPI_Finalize();
+
+    if (rank == 0)
+        std::cerr << " === total " << (timer::now() - start_time) / 1s << "s" << std::endl;
+
+    return 0;
+}
