@@ -278,9 +278,14 @@ void predicateScan_kernel( T *out, const T *in, size_t N, size_t elementsPerPart
 // **************************************************************************
 template<class T, bool bZeroPad>
 __global__ void
-streamCompact_kernel(T *pdo_m, T *pdo_x, T *pdo_y, T *pdo_u, T *pdo_v, T *pfo_u, T *pfo_v,
-    int *outCount, const int *gBaseSums, const T *pdi_m, const T *pdi_x, const T *pdi_y,
-    const T *pdi_u, const T *pdi_v, const T *pfi_u, const T *pfi_v, const int *mask,
+streamCompact_kernel(
+    T *pdo_m, T *pdo_x, T *pdo_y, T *pdo_z,
+    T *pdo_u, T *pdo_v, T *pdo_w, T *pfo_u, T *pfo_v, T *pfo_w,
+    int *outCount, const int *gBaseSums,
+    const T *pdi_m, const T *pdi_x, const T *pdi_y, const T *pdi_z,
+    const T *pdi_u, const T *pdi_v, const T *pdi_w,
+    const T *pfi_u, const T *pfi_v, const T *pfi_w,
+    const int *mask,
     size_t N, size_t elementsPerPartial )
 {
     extern volatile __shared__ int sPartials[];
@@ -326,10 +331,13 @@ streamCompact_kernel(T *pdo_m, T *pdo_x, T *pdo_y, T *pdo_u, T *pdo_v, T *pfo_u,
             pdo_m[outIndex] = pdi_m[index];
             pdo_x[outIndex] = pdi_x[index];
             pdo_y[outIndex] = pdi_y[index];
+            pdo_z[outIndex] = pdi_z[index];
             pdo_u[outIndex] = pdi_u[index];
             pdo_v[outIndex] = pdi_v[index];
+            pdo_w[outIndex] = pdi_w[index];
             pfo_u[outIndex] = pfi_u[index];
             pfo_v[outIndex] = pfi_v[index];
+            pfo_w[outIndex] = pfi_w[index];
         }
 
         __syncthreads();
@@ -382,9 +390,15 @@ __device__ int g_globalPartials[MAX_PARTIALS];
  * @returns zero if successful
  */
 template<class T, bool bZeroPad>
-int streamCompact( T *pdo_m, T *pdo_x, T *pdo_y, T *pdo_u, T *pdo_v, T *pfo_u, T *pfo_v,
-    int &nOut, const T *pdi_m, const T *pdi_x, const T *pdi_y, const T *pdi_u,
-    const T *pdi_v, const T *pfi_u, const T *pfi_v, const int *mask, size_t N, int b )
+int streamCompact(
+    T *pdo_m, T *pdo_x, T *pdo_y, T *pdo_z,
+    T *pdo_u, T *pdo_v, T *pdo_w,
+    T *pfo_u, T *pfo_v, T *pfo_w,
+    int &nOut,
+    const T *pdi_m, const T *pdi_x, const T *pdi_y, const T *pdi_z,
+    const T *pdi_u, const T *pdi_v, const T *pdi_w,
+    const T *pfi_u, const T *pfi_v, const T *pfi_w,
+    const int *mask, size_t N, int b )
 {
     cudaError_t ierr = cudaSuccess;
 
@@ -403,11 +417,17 @@ int streamCompact( T *pdo_m, T *pdo_x, T *pdo_y, T *pdo_u, T *pdo_v, T *pfo_u, T
     if ( N <= b )
     {
         // compact on one block with b threads
-        streamCompact_kernel<T, bZeroPad><<<1,b,sBytes>>>( pdo_m, pdo_x,
-            pdo_y, pdo_u, pdo_v, pfo_u, pfo_v, outCount, 0, pdi_m, pdi_x,
-            pdi_y, pdi_u, pdi_v, pfi_u, pfi_v, mask, N, N );
+        streamCompact_kernel<T, bZeroPad><<<1,b,sBytes>>>(
+            pdo_m, pdo_x, pdo_y, pdo_z,
+            pdo_u, pdo_v, pdo_w,
+            pfo_u, pfo_v, pfo_w,
+            outCount, 0,
+            pdi_m, pdi_x, pdi_y, pdi_z,
+            pdi_u, pdi_v, pdi_w,
+            pfi_u, pfi_v, pfi_w,
+            mask, N, N );
 
-        // fethc the length of the compacted arrays
+        // fetch the length of the compacted arrays
         if ((ierr = cudaMemcpy(&nOut, outCount, sizeof(int), cudaMemcpyDeviceToHost)) != cudaSuccess)
         {
             std::cerr << "Failed to fetch the output length from the device" << std::endl;
@@ -454,9 +474,15 @@ int streamCompact( T *pdo_m, T *pdo_x, T *pdo_y, T *pdo_u, T *pdo_v, T *pfo_u, T
     predicateScan_kernel<int, bZeroPad><<<1,b,sBytes>>>( gPartials, gPartials, numPartials, numPartials);
 
     // copy the flagged data
-    streamCompact_kernel<T, bZeroPad><<<numBlocks,b,sBytes>>>( pdo_m, pdo_x, pdo_y,
-        pdo_u, pdo_v, pfo_u, pfo_v, outCount, gPartials,  pdi_m, pdi_x, pdi_y, pdi_u,
-        pdi_v, pfi_u, pfi_v, mask, N, elementsPerPartial );
+    streamCompact_kernel<T, bZeroPad><<<numBlocks,b,sBytes>>>(
+        pdo_m, pdo_x, pdo_y, pdo_z,
+        pdo_u, pdo_v, pdo_w,
+        pfo_u, pfo_v, pfo_w,
+        outCount, gPartials,
+        pdi_m, pdi_x, pdi_y, pdi_z,
+        pdi_u, pdi_v, pdi_w,
+        pfi_u, pfi_v, pfi_w,
+        mask, N, elementsPerPartial );
 
     // fetch the length of the compacted arrays
     if ((ierr = cudaMemcpy(&nOut, outCount, sizeof(int), cudaMemcpyDeviceToHost)) != cudaSuccess)
@@ -472,14 +498,26 @@ int streamCompact( T *pdo_m, T *pdo_x, T *pdo_y, T *pdo_u, T *pdo_v, T *pfo_u, T
 }
 
 // **************************************************************************
-int stream_compact( double *pdo_m, double *pdo_x, double *pdo_y,
-    double *pdo_u, double *pdo_v, double *pfo_u, double *pfo_v,
-    int &outCount, const double *pdi_m, const double *pdi_x,
-    const double *pdi_y, const double *pdi_u, const double *pdi_v,
-    const double *pfi_u, const double *pfi_v, const int *mask,
-    size_t N, int b )
+int stream_compact(
+    double *pdo_m,
+    double *pdo_x, double *pdo_y, double *pdo_z,
+    double *pdo_u, double *pdo_v, double *pdo_w,
+    double *pfo_u, double *pfo_v, double *pfo_w,
+    int &outCount,
+    const double *pdi_m,
+    const double *pdi_x, const double *pdi_y, const double *pdi_z,
+    const double *pdi_u, const double *pdi_v, const double *pdi_w,
+    const double *pfi_u, const double *pfi_v, const double *pfi_w,
+    const int *mask, size_t N, int b )
 {
-    return streamCompact<double,true>(pdo_m, pdo_x, pdo_y, pdo_u, pdo_v, pfo_u, pfo_v,
-        outCount, pdi_m, pdi_x, pdi_y, pdi_u, pdi_v, pfi_u, pfi_v, mask, N, b);
+    return streamCompact<double,true>(
+        pdo_m, pdo_x, pdo_y, pdo_z,
+        pdo_u, pdo_v, pdo_w,
+        pfo_u, pfo_v, pfo_w,
+        outCount,
+        pdi_m, pdi_x, pdi_y, pdi_z,
+        pdi_u, pdi_v, pdi_w,
+        pfi_u, pfi_v, pfi_w,
+        mask, N, b);
 }
 }
