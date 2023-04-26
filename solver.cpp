@@ -5,7 +5,7 @@
 #include <math.h>
 
 // --------------------------------------------------------------------------
-void forces(const patch_data &pd, patch_force &pf, double eps)
+void forces(const patch_data &pd, patch_force &pf, double G, double eps)
 {
     long n = pd.size();
 
@@ -49,7 +49,6 @@ void forces(const patch_data &pd, patch_force &pf, double eps)
             double r2e2 = rx*rx + ry*ry + rz*rz + eps2;
             double r2e23 = r2e2*r2e2*r2e2;
 
-            double G = 6.67408e-11;
             double mf = G*pd_m[i]*pd_m[j] / sqrt(r2e23);
 
             fx += (i == j ? 0. : rx*mf);
@@ -69,7 +68,7 @@ void forces(const patch_data &pd, patch_force &pf, double eps)
 }
 
 // --------------------------------------------------------------------------
-void forces(const patch_data &lpd, const patch_data &rpd, patch_force &pf, double eps)
+void forces(const patch_data &lpd, const patch_data &rpd, patch_force &pf, double G, double eps)
 {
     long n = lpd.size();
     long m = rpd.size();
@@ -120,7 +119,6 @@ void forces(const patch_data &lpd, const patch_data &rpd, patch_force &pf, doubl
             double r2e2 = rx*rx + ry*ry + rz*rz + eps2;
             double r2e23 = r2e2*r2e2*r2e2;
 
-            double G = 6.67408e-11;
             double mf = G*lpd_m[i]*rpd_m[j] / sqrt(r2e23);
 
             fx += rx*mf;
@@ -141,7 +139,7 @@ void forces(const patch_data &lpd, const patch_data &rpd, patch_force &pf, doubl
 
 // --------------------------------------------------------------------------
 void forces(MPI_Comm comm, patch_data &pd, patch_force &pf,
-    double eps, const std::vector<int> &nf)
+    double G, double eps, const std::vector<int> &nf)
 {
     int rank = 0;
     int n_ranks = 1;
@@ -153,7 +151,7 @@ void forces(MPI_Comm comm, patch_data &pd, patch_force &pf,
     pf.resize(n);
 
     // local forces
-    forces(pd, pf, eps);
+    forces(pd, pf, G, eps);
 
     // remote forces
     for (int j = 0; j < n_ranks; ++j)
@@ -183,7 +181,7 @@ void forces(MPI_Comm comm, patch_data &pd, patch_force &pf,
                 recv_mp(comm, pdj, j, 4000);
 
                 // calc force on bodies in i from bodies in j
-                forces(pd, pdj, pf, eps);
+                forces(pd, pdj, pf, G, eps);
             }
             else if ((rank == j) && (i != j))
             {
@@ -206,7 +204,7 @@ void forces(MPI_Comm comm, patch_data &pd, patch_force &pf,
                 }
 
                 // calc force on bodies in j from bodies in i
-                forces(pd, pdi, pf, eps);
+                forces(pd, pdi, pf, G, eps);
             }
 
             // wait for sends to complete
@@ -218,8 +216,8 @@ void forces(MPI_Comm comm, patch_data &pd, patch_force &pf,
 
 // --------------------------------------------------------------------------
 void velocity_verlet(MPI_Comm comm,
-    patch_data &pd, patch_force &pf, double h, double eps,
-    const std::vector<int> &nf)
+    patch_data &pd, patch_force &pf, double G, double h,
+    double eps, const std::vector<int> &nf)
 {
     double h2 = h/2.;
     long n = pd.size();
@@ -256,7 +254,7 @@ void velocity_verlet(MPI_Comm comm,
     }
 
     // update the forces
-    forces(comm, pd, pf, eps, nf);
+    forces(comm, pd, pf, G, eps, nf);
 
     #pragma omp target teams distribute parallel for is_device_ptr(pd_m,pd_u,pd_v,pd_w,pf_u,pf_v,pf_w)
     for (long i = 0; i < n; ++i)

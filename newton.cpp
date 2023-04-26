@@ -72,7 +72,7 @@ int main(int argc, char **argv)
 
     // initialize forces
     patch_force pf;
-    forces(comm, pd, pf, eps, nf);
+    forces(comm, pd, pf, G, eps, nf);
 
     // write initial state
     if (io_int)
@@ -88,7 +88,7 @@ int main(int argc, char **argv)
         auto it_time  = timer::now();
 
         // update bodies
-        velocity_verlet(comm, pd, pf, h, eps, nf);
+        velocity_verlet(comm, pd, pf, G, h, eps, nf);
 
         // update partition
         //if (n_ranks > 1)

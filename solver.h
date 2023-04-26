@@ -11,21 +11,21 @@
  * handle force initialization and should always occur before accumulating
  * remote forces
  */
-void forces(const patch_data &pd, patch_force &pf, double eps);
+void forces(const patch_data &pd, patch_force &pf, double G, double eps);
 
 /** Accumulates the forces from bodies on this MPI rank (lpd) with those from
  * another MPI rank (rpd). nf is a map that determines the required resolution.
  * eps is a softening factor.
  */
 void forces(const patch_data &lpd, const patch_data &rpd,
-    patch_force &pf, double eps);
+    patch_force &pf, double G, double eps);
 
 /** Accumulates the forces from all bodies local and remote (i.e. other MPI
  * ranks). nf is a map that determines the required resolution. eps is a
  * softening factor.
  */
 void forces(MPI_Comm comm, patch_data &pd, patch_force &pf,
-    double eps, const std::vector<int> &nf);
+    double G, double eps, const std::vector<int> &nf);
 
 /** Velocity Verlet:
  *
@@ -37,7 +37,7 @@ void forces(MPI_Comm comm, patch_data &pd, patch_force &pf,
  * a map that determines the required resolution. eps is a softening factor.
  */
 void velocity_verlet(MPI_Comm comm,
-    patch_data &pd, patch_force &pf, double h, double eps,
+    patch_data &pd, patch_force &pf, double G, double h, double eps,
     const std::vector<int> &nf);
 
 #endif
