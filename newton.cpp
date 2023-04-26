@@ -9,6 +9,10 @@
 #include "initialize_file.h"
 #include "solver.h"
 #include "write_vtk.h"
+#include "command_line.h"
+#if defined(ENABLE_SENSEI)
+#include "insitu.h"
+#endif
 
 #include <iostream>
 #include <vector>
@@ -38,33 +42,50 @@ int main(int argc, char **argv)
 
     int rank = 0;
     int n_ranks = 1;
-
     MPI_Comm comm = MPI_COMM_WORLD;
+
     MPI_Init(&argc, &argv);
+
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &n_ranks);
 
-    double h = 0.;              // time step size
-    double nfr = 0.;            // distance for reduced representation
-    double eps = 1e4;           // softener
-    const char *odir = nullptr; // where to write results
-    long nits = 0;              // number of iterations
-    long io_int = 0;            // how often to write results
+    double h = 1e5;                 // time step size
+    double nfr = 0.;                // distance for reduced representation
+    double eps = 0.;                // the softening length
+    double G = 6.67408e-11;         // the gravitational constant
+    long n_its = 0;                 // number of solver steps
+    long n_bodies = 0;              // number of bodies
+    const char *in_dir = nullptr;   // directory where initial conditions can be found
+    const char *out_dir = nullptr;  // directory to write results at
+    long io_int = 0;                // how often to write resutls
+    const char *is_conf = nullptr;  // sensei in situ configuration file
+    long is_int = 0;                // how often to invoke in situ processing
+
+    if (parse_command_line(argc, argv, comm, G, h, eps, nfr,
+        n_its, n_bodies, in_dir, out_dir, io_int, is_conf, is_int))
+        return -1;
 
     // load the initial condition and initialize the bodies
     patch_data pd;
     std::vector<patch> patches;
 #if defined(DEBUG_IC)
-    if (initialize_random(argc, argv, comm, patches, pd, h, eps, nfr, odir, nits, io_int))
+    if (initialize_random(comm, n_bodies, patches, pd, h, eps, nfr))
         return -1;
 #else
-    if (initialize_file(argc, argv, comm, patches, pd, h, eps, nfr, odir, nits, io_int))
+    if (initialize_file(comm, in_dir, patches, pd, h, eps, nfr, out_dir, n_its, io_int, is_int))
+        return -1;
+#endif
+
+#if defined(ENABLE_SENSEI)
+    // initialize for in-situ
+    insitu_data is_data;
+    if (is_conf && is_int && init_insitu(comm, is_conf, is_data))
         return -1;
 #endif
 
     // write the domain decomp
     if (io_int)
-        write_vtk(comm, patches, odir);
+        write_vtk(comm, patches, out_dir);
 
     // flag nearby patches
     std::vector<int> nf;
@@ -76,14 +97,20 @@ int main(int argc, char **argv)
 
     // write initial state
     if (io_int)
-       write_vtk(comm, pd, pf, odir);
+        write_vtk(comm, pd, pf, out_dir);
+
+#if defined(ENABLE_SENSEI)
+    // process initial state
+    if (is_int && is_data && update_insitu(comm, is_data, 0, 0, patches, pd, pf))
+        return -1;
+#endif
 
     if (rank == 0)
         std::cerr << " === init " << (timer::now() - start_time) / 1ms << "ms" << std::endl;
 
     // iterate
     long it = 0;
-    while (it < nits)
+    while (it < n_its)
     {
         auto it_time  = timer::now();
 
@@ -100,13 +127,24 @@ int main(int argc, char **argv)
 
         // write current state
         if (io_int && (((it + 1) % io_int) == 0))
-            write_vtk(comm, pd, pf, odir);
+            write_vtk(comm, pd, pf, out_dir);
 
+#if defined(ENABLE_SENSEI)
+        // process current state
+        if (is_int && is_data && update_insitu(comm, is_data, it, it*h, patches, pd, pf))
+            return -1;
+#endif
         it += 1;
 
         if (rank == 0)
             std::cerr << " === it " << it << " : " << (timer::now() - it_time) / 1ms << "ms" << std::endl;
     }
+
+#if defined(ENABLE_SENSEI)
+    // finalize in-situ processing
+    if (is_int && is_data && finalize_insitu(comm, is_data))
+        return -1;
+#endif
 
     MPI_Finalize();
 

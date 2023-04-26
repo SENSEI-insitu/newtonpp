@@ -177,29 +177,13 @@ int initialize_file(MPI_Comm comm, const std::string &idir,
 }
 
 // --------------------------------------------------------------------------
-int initialize_file(int argc, char **argv,
-    MPI_Comm comm,
+int initialize_file(MPI_Comm comm, const char *idir,
     std::vector<patch> &patches, patch_data &lpd,
     double &h, double &eps, double &nfr,
     const char *&odir, long &nits, long &io_int)
 {
     int rank = 0;
     MPI_Comm_rank(comm, &rank);
-
-    // parse the command line
-    if (argc != 5)
-    {
-        if (rank == 0)
-            std::cerr << "usage:" << std::endl
-                << "newtonpp [in dir] [out dir] [n its] [io int]" << std::endl;
-        return -1;
-    }
-
-    int q = 0;
-    const char *idir = argv[++q];
-    odir = argv[++q];
-    nits = atoi(argv[++q]);
-    io_int = atoi(argv[++q]);
 
     // initialize
     if (initialize_file(comm, idir, patches, lpd, h, eps, nfr))

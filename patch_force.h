@@ -3,7 +3,6 @@
 
 #include "memory_management.h"
 
-
 /// the forces on a set of bodies
 struct patch_force
 {
@@ -22,10 +21,13 @@ struct patch_force
     void resize(long n);
     void append(const patch_force &o);
 
+    /// read access to the data
     auto get_cpu_accessible() const { return hamr::get_cpu_accessible(m_u, m_v, m_w); }
     auto get_openmp_accessible() const { return hamr::get_openmp_accessible(m_u, m_v, m_w); }
 
+    /// write access to the data
     auto get_data() { return  hamr::data(m_u, m_v, m_w); }
+    auto get_data() const { return  hamr::data(m_u, m_v, m_w); }
 
     hamr::buffer<double> m_u;   ///< body force x
     hamr::buffer<double> m_v;   ///< body force y

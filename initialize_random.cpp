@@ -149,29 +149,12 @@ int initialize_random(MPI_Comm comm,
 }
 
 // --------------------------------------------------------------------------
-int initialize_random(int argc, char **argv,
-    MPI_Comm comm,
+int initialize_random(MPI_Comm comm, long nb,
     std::vector<patch> &patches, patch_data &lpd,
-    double &h, double &eps, double &nfr,
-    const char *&odir, long &nits, long &io_int)
+    double &h, double &eps, double &nfr)
 {
     int rank = 0;
     MPI_Comm_rank(comm, &rank);
-
-    // parse the command line
-    if (argc != 5)
-    {
-        if (rank == 0)
-            std::cerr << "usage:" << std::endl
-                << "newtonpp [n bodies] [out dir] [n its] [io int]" << std::endl;
-        return -1;
-    }
-
-    int q = 0;
-    long nb = atoi(argv[++q]);
-    odir = argv[++q];
-    nits = atoi(argv[++q]);
-    io_int = atoi(argv[++q]);
 
     // initialize
     if (initialize_random(comm, patches, lpd, h, eps, nfr, nb))
