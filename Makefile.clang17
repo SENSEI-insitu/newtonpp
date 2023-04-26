@@ -12,8 +12,6 @@
 # CC=gcc
 # CXX=g++
 
-# OpenMP + CUDA
-HAMR=/work/SENSEI/HAMR-clang_omp/
 
 MPI_FLAGS=-I/usr/include/mpich-x86_64
 MPI_LINK= -L/usr/lib64/mpich/lib -Wl,-rpath -Wl,/usr/lib64/mpich/lib -Wl,--enable-new-dtags -lmpi
@@ -25,12 +23,22 @@ CFLAGS=-Wall -Wextra -fPIE -std=c++17
 C_OPT_FLAGS=-O3 -march=native -mtune=native
 CLINK=-lm -lstdc++
 
+CUDA=/usr/local/cuda-12.0/lib64/
 CUDA_OPT_FLAGS=-O3
 CUDA_XOPT_FLAGS=-O3,-march=native,-mtune=native
-CUDA=/usr/local/cuda-12.0/lib64/
+CUDA_LINK=
 
 CC=/home/bloring/work/llvm/llvm-install/bin/clang
 CXX=/home/bloring/work/llvm/llvm-install/bin/clang++
+
+SENSEI=/work/SENSEI/sensei-svtk-install
+SENSEI_LINK=`${SENSEI}/bin/sensei_config --libs`
+SENSEI_FLAGS=`${SENSEI}/bin/sensei_config --cflags`
+
+#HAMR=/work/SENSEI/HAMR-clang_omp/
+HAMR=$(SENSEI)/
+HAMR_FLAGS=-I$(HAMR)/include
+HAMR_LINK=$(HAMR)/lib64/libhamr.a
 
 .PHONY: all
 all : stream_compact.a newtonpp_clang_omp
@@ -51,16 +59,25 @@ stream_compact.a: stream_compact.cu stream_compact.cxx
 	ranlib stream_compact.a
 
 %.o: %.cpp
-	$(CC) $(OMP_FLAGS) $(MPI_FLAGS) $(CFLAGS) $(C_OPT_FLAGS) -I./ -I$(HAMR)/include -c $< -o $@
+	$(CC) $(OMP_FLAGS) $(MPI_FLAGS) $(CFLAGS) $(C_OPT_FLAGS) $(HAMR_FLAGS) -I./ -c $< -o $@
 
 newtonpp_objs=domain_decomp.o initialize_file.o patch_data.o communication.o \
 	 initialize_random.o patch.o patch_force.o solver.o write_vtk.o
 
+ifneq ($(SENSEI),)
+newtonpp_objs += sensei_adaptor.o
+
+sensei_adaptor.o: sensei_adaptor.cpp
+	$(CC) $(OMP_FLAGS) $(MPI_FLAGS) $(CFLAGS) $(C_OPT_FLAGS) $(HAMR_FLAGS) $(SENSEI_FLAGS) -I./ -c $< -o $@
+
+endif
+
+
 newtonpp_clang_omp:  stream_compact.a $(newtonpp_objs) newton.cpp
-	$(CC) $(OMP_FLAGS) $(MPI_FLAGS) $(CFLAGS) $(C_OPT_FLAGS) \
-	-I./ -I$(HAMR)/include newton.cpp $(newtonpp_objs) \
-	-o newtonpp_clang_omp $(CLINK) $(MPI_LINK) $(OMP_LINK) \
-	$(HAMR)/lib/libhamr.a stream_compact.a ${CUDA}/libcudart_static.a
+	$(CC) $(OMP_FLAGS) $(MPI_FLAGS) $(CFLAGS) $(C_OPT_FLAGS) $(HAMR_FLAGS) -I./ \
+	newton.cpp $(newtonpp_objs) -o newtonpp_clang_omp \
+	$(CLINK) $(MPI_LINK) $(OMP_LINK) $(SENSEI_LINK) $(HAMR_LINK) \
+	stream_compact.a ${CUDA}/libcudart_static.a
 
 galaxy_ic: galaxy_ic.cpp
 	g++  $(C_OPT_FLAGS)  galaxy_ic.cpp -o galaxy_ic
