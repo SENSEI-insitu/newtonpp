@@ -27,19 +27,14 @@ void forces(const patch_data &pd, patch_force &pf, double G, double eps)
     double *pf_w = pf.m_w.data();
 #endif
 
-    double fx,fy,fz;
-    #pragma omp target enter data map(alloc: fx,fy,fz)
-
+    #pragma omp target teams distribute is_device_ptr(pf_u,pf_v,pf_w,pd_m,pd_x,pd_y,pd_z)
     for (long i = 0; i < n; ++i)
     {
-        #pragma omp target map(alloc: fx,fy,fz)
-        {
-        fx = 0.;
-        fy = 0.;
-        fz = 0.;
-        }
+        double fx = 0.;
+        double fy = 0.;
+        double fz = 0.;
 
-        #pragma omp target teams distribute parallel for reduction(+: fx,fy,fz) is_device_ptr(pd_m,pd_x,pd_y,pd_z), map(alloc: fx,fy,fz)
+        #pragma omp parallel for reduction(+: fx,fy,fz)
         for (long j = 0; j < n; ++j)
         {
             double rx = pd_x[j] - pd_x[i];
@@ -56,15 +51,10 @@ void forces(const patch_data &pd, patch_force &pf, double G, double eps)
             fz += (i == j ? 0. : rz*mf);
         }
 
-        #pragma omp target is_device_ptr(pf_u,pf_v,pf_w), map(alloc: fx,fy,fz)
-        {
         pf_u[i] = fx;
         pf_v[i] = fy;
         pf_w[i] = fz;
-        }
     }
-
-    #pragma omp target exit data map(release: fx,fy,fz)
 }
 
 // --------------------------------------------------------------------------
@@ -97,19 +87,14 @@ void forces(const patch_data &lpd, const patch_data &rpd, patch_force &pf, doubl
     double *pf_w = pf.m_w.data();
 #endif
 
-    double fx, fy, fz;
-
-    #pragma omp target enter data map(alloc: fx,fy,fz)
+    #pragma omp target teams distribute is_device_ptr(pf_u,pf_v,pf_w,lpd_m,lpd_x,lpd_y,lpd_z, rpd_m,rpd_x,rpd_y,rpd_z)
     for (long i = 0; i < n; ++i)
     {
-        #pragma omp target map(alloc: fx,fy,fz)
-        {
-        fx = 0.;
-        fy = 0.;
-        fz = 0.;
-        }
+        double fx = 0.;
+        double fy = 0.;
+        double fz = 0.;
 
-        #pragma omp target teams distribute parallel for reduction(+: fx,fy,fz) is_device_ptr(lpd_m,lpd_x,lpd_y,lpd_z, rpd_m,rpd_x,rpd_y,rpd_z), map(alloc: fx,fy,fz)
+        #pragma omp parallel for reduction(+: fx,fy,fz)
         for (long j = 0; j < m; ++j)
         {
             double rx = rpd_x[j] - lpd_x[i];
@@ -126,15 +111,10 @@ void forces(const patch_data &lpd, const patch_data &rpd, patch_force &pf, doubl
             fz += rz*mf;
         }
 
-        #pragma omp target is_device_ptr(pf_u,pf_v,pf_w), map(alloc: fx,fy,fz)
-        {
         pf_u[i] += fx;
         pf_v[i] += fy;
         pf_w[i] += fz;
-        }
     }
-
-    #pragma omp target exit data map(release: fx,fy,fz)
 }
 
 // --------------------------------------------------------------------------
