@@ -1,7 +1,8 @@
 
 #module load /work2/cuda/hpc_sdk/modulefiles/nvhpc/23.3
 
-USE_SENSEI=1
+USE_SENSEI=
+
 CXX=`which nvc++`
 
 
