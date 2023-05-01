@@ -6,7 +6,7 @@
 #include "domain_decomp.h"
 #include "communication.h"
 #include "initialize_random.h"
-#include "initialize_file.h"
+#include "read_magi.h"
 #include "solver.h"
 #include "write_vtk.h"
 #include "command_line.h"
@@ -55,26 +55,49 @@ int main(int argc, char **argv)
     double G = 6.67408e-11;         // the gravitational constant
     long n_its = 0;                 // number of solver steps
     long n_bodies = 0;              // number of bodies
-    const char *in_dir = nullptr;   // directory where initial conditions can be found
+    const char *magi_file = nullptr;// where initial conditions can be found
     const char *out_dir = nullptr;  // directory to write results at
     long io_int = 0;                // how often to write resutls
     const char *is_conf = nullptr;  // sensei in situ configuration file
     long is_int = 0;                // how often to invoke in situ processing
 
     if (parse_command_line(argc, argv, comm, G, h, eps, nfr,
-        n_its, n_bodies, in_dir, out_dir, io_int, is_conf, is_int))
+        n_its, n_bodies, magi_file, out_dir, io_int, is_conf, is_int))
         return -1;
 
     // load the initial condition and initialize the bodies
     patch_data pd;
+    patch_force pf;
     std::vector<patch> patches;
-#if defined(DEBUG_IC)
-    if (initialize_random(comm, n_bodies, patches, pd, h, eps, nfr))
-        return -1;
-#else
-    if (initialize_file(comm, in_dir, patches, pd, h, eps, nfr, out_dir, n_its, io_int, is_int))
-        return -1;
+
+#if defined(ENABLE_MAGI)
+    if (magi_file)
+    {
+        // load the ic
+        patch dom;
+        if (magi_file && read_magi(comm, magi_file, dom, pd))
+            return -1;
+
+        // decompose domain
+        patches = partition(dom, n_ranks);
+        assign_patches(patches, n_ranks);
+
+        // update partition
+        if (n_ranks > 1)
+        {
+            pf.resize(pd.size());
+
+            hamr::buffer<int> dest(def_alloc());
+            partition(comm, patches, pd, dest);
+            move(comm, pd, pf, dest);
+        }
+    }
+    else
 #endif
+    {
+        if (initialize_random(comm, n_bodies, patches, pd, h, eps, nfr))
+            return -1;
+    }
 
 #if defined(ENABLE_SENSEI)
     // initialize for in-situ
@@ -92,7 +115,6 @@ int main(int argc, char **argv)
     near(patches, nfr, nf);
 
     // initialize forces
-    patch_force pf;
     forces(comm, pd, pf, G, eps, nf);
 
     // write initial state

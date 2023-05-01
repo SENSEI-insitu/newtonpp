@@ -1,13 +1,16 @@
 
 
-USE_SENSEI=1
+USE_SENSEI=
+USE_MAGI=
 
 CXX=clang++-15
 
-MPI_FLAGS=-I/usr/include/mpich-x86_64
-MPI_LINK= -L/usr/lib64/mpich/lib -Wl,-rpath -Wl,/usr/lib64/mpich/lib -Wl,--enable-new-dtags -lmpi
 
-OMP_FLAGS=-DENABLE_OMP -DENABLE_CUDA -fopenmp -fopenmp-targets=nvptx64 -Xopenmp-target=nvptx64 --offload-arch=sm_75
+MPI_FLAGS=-I/usr/include/mpich-x86_64
+MPI_LINK=-L/usr/lib64/mpich/lib -Wl,-rpath -Wl,/usr/lib64/mpich/lib -Wl,--enable-new-dtags -lmpi
+
+# for debug build add :  -Xarch_host -g -Xarch_host -O0
+OMP_FLAGS=-DENABLE_OMP -DENABLE_CUDA -fopenmp -fopenmp-targets=nvptx64 -Xopenmp-target=nvptx64 --offload-arch=sm_75 -Xarch_host -g -Xarch_host -O0
 OMP_LINK=
 
 CFLAGS=-Wall -Wextra -fPIE -std=c++17
@@ -37,6 +40,11 @@ endif
 HAMR_FLAGS=-I$(HAMR)/include
 HAMR_LINK=$(HAMR)/lib64/libhamr.a
 
+ifneq ($(USE_MAGI),)
+	CFLAGS += -DENABLE_MAGI
+	HDF5_FLAGS=-I/usr/include/mpich-x86_64
+	HDF5_LINK=-L/usr/lib64/mpich/lib -lhdf5
+endif
 
 
 .PHONY: all
@@ -47,7 +55,7 @@ ics: galaxy_ic plot_ic
 
 .PHONY: clean
 clean:
-	rm -f *.o stream_compact.a newtonpp_clang_omp
+	rm -f *.o stream_compact.a newtonpp_clang15_omp
 
 
 
@@ -62,7 +70,7 @@ stream_compact.a: stream_compact.cu stream_compact.cxx
 
 
 %.o: %.cpp
-	$(CXX) $(OMP_FLAGS) $(MPI_FLAGS) $(CFLAGS) $(C_OPT_FLAGS) $(HAMR_FLAGS) $(SENSEI_FLAGS) -I./ -c $< -o $@
+	$(CXX) $(OMP_FLAGS) $(MPI_FLAGS) $(HDF5_FLAGS) $(CFLAGS) $(C_OPT_FLAGS) $(HAMR_FLAGS) $(SENSEI_FLAGS) -I./ -c $< -o $@
 
 
 newtonpp_objs=domain_decomp.o initialize_file.o patch_data.o communication.o \
@@ -72,13 +80,17 @@ ifneq ($(USE_SENSEI),)
 	newtonpp_objs += sensei_adaptor.o insitu.o
 endif
 
+ifneq ($(USE_MAGI),)
+	newtonpp_objs += read_magi.o
+endif
+
 
 newtonpp_clang15_omp:  stream_compact.a $(newtonpp_objs) newton.cpp
-	$(CXX) $(OMP_FLAGS) $(MPI_FLAGS) $(CFLAGS) \
+	$(CXX) $(OMP_FLAGS) $(MPI_FLAGS) $(HDF5_FLAGS) $(CFLAGS) \
 	$(C_OPT_FLAGS) $(HAMR_FLAGS) $(SENSEI_FLAGS) -I./ \
 	newton.cpp $(newtonpp_objs) \
 	stream_compact.a ${CUDA}/libcudart_static.a \
-	$(SENSEI_LINK) $(HAMR_LINK) $(CLINK) $(MPI_LINK) $(OMP_LINK) \
+	$(SENSEI_LINK) $(HAMR_LINK) $(CLINK) $(MPI_LINK) $(HDF5_LINK) $(OMP_LINK) \
 	-o newtonpp_clang15_omp
 
 

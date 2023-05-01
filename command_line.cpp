@@ -7,8 +7,9 @@
 // --------------------------------------------------------------------------
 int parse_command_line(int argc, char **argv, MPI_Comm comm,
     double &G, double &dt, double &eps, double &theta,
-    long &n_its, long &n_bodies, const char *in_dir, const char *&out_dir,
-    long &io_int, const char *&is_conf, long &is_int)
+    long &n_its, long &n_bodies, const char *&magi_file,
+    const char *&out_dir, long &io_int, const char *&is_conf,
+    long &is_int)
 {
     int rank = 0;
     MPI_Comm_rank(comm, &rank);
@@ -28,7 +29,7 @@ int parse_command_line(int argc, char **argv, MPI_Comm comm,
                     << "    --theta      : threshold for reduced representation" << std::endl
                     << "    --n_its      : how many iterations to perform" << std::endl
                     << "    --n_bodies   : the total number of bodies" << std::endl
-                    << "    --in_dir     : directory w/ initialization files" << std::endl
+                    << "    --magi_file  : MAGI initialization files" << std::endl
                     << "    --out_dir    : where to write the results" << std::endl
                     << "    --out_int    : how often to write results" << std::endl
                     << "    --sensei_xml : a sensei configuration file" << std::endl
@@ -76,11 +77,11 @@ int parse_command_line(int argc, char **argv, MPI_Comm comm,
                 if (rank == 0)
                     std::cerr << "will generate " << n_bodies << " bodies total" << std::endl;
             }
-            else if(strcmp(argv[q], "--in_dir") == 0)
+            else if(strcmp(argv[q], "--magi_file") == 0)
             {
-                in_dir = argv[++q];
+                magi_file = argv[++q];
                 if (rank == 0)
-                    std::cerr << "initializing from " << in_dir << std::endl;
+                    std::cerr << "initializing from " << magi_file << std::endl;
             }
             else if(strcmp(argv[q], "--out_dir") == 0)
             {
