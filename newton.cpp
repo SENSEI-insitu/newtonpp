@@ -10,7 +10,7 @@
 #include "solver.h"
 #include "write_vtk.h"
 #include "command_line.h"
-#if defined(ENABLE_SENSEI)
+#if defined(NEWTONPP_ENABLE_SENSEI)
 #include "insitu.h"
 #endif
 
@@ -22,13 +22,13 @@
 using namespace std::literals;
 using timer = std::chrono::high_resolution_clock;
 
-#if defined(ENABLE_OMP)
+#if defined(NEWTONPP_ENABLE_OMP)
 #pragma message("the default allocator targets the GPU")
 #else
 #pragma message("the default allocator targets the CPU")
 #endif
 
-#if defined(ENABLE_CUDA)
+#if defined(NEWTONPP_ENABLE_CUDA)
 #pragma message("Stream compact on the GPU")
 #else
 #pragma message("Stream compact on the CPU")
@@ -70,7 +70,7 @@ int main(int argc, char **argv)
     patch_force pf;
     std::vector<patch> patches;
 
-#if defined(ENABLE_MAGI)
+#if defined(NEWTONPP_ENABLE_MAGI)
     if (magi_file)
     {
         // load the ic
@@ -99,7 +99,7 @@ int main(int argc, char **argv)
             return -1;
     }
 
-#if defined(ENABLE_SENSEI)
+#if defined(NEWTONPP_ENABLE_SENSEI)
     // initialize for in-situ
     insitu_data is_data;
     if (is_conf && is_int && init_insitu(comm, is_conf, is_data))
@@ -121,7 +121,7 @@ int main(int argc, char **argv)
     if (io_int)
         write_vtk(comm, pd, pf, out_dir);
 
-#if defined(ENABLE_SENSEI)
+#if defined(NEWTONPP_ENABLE_SENSEI)
     // process initial state
     if (is_int && is_data && update_insitu(comm, is_data, 0, 0, patches, pd, pf))
         return -1;
@@ -151,7 +151,7 @@ int main(int argc, char **argv)
         if (io_int && (((it + 1) % io_int) == 0))
             write_vtk(comm, pd, pf, out_dir);
 
-#if defined(ENABLE_SENSEI)
+#if defined(NEWTONPP_ENABLE_SENSEI)
         // process current state
         if (is_int && is_data && update_insitu(comm, is_data, it, it*h, patches, pd, pf))
             return -1;
@@ -162,7 +162,7 @@ int main(int argc, char **argv)
             std::cerr << " === it " << it << " : " << (timer::now() - it_time) / 1ms << "ms" << std::endl;
     }
 
-#if defined(ENABLE_SENSEI)
+#if defined(NEWTONPP_ENABLE_SENSEI)
     // finalize in-situ processing
     if (is_int && is_data && finalize_insitu(comm, is_data))
         return -1;

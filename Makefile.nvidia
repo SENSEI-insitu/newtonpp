@@ -13,7 +13,7 @@ MPI_FLAGS=-I/work2/cuda/hpc_sdk/Linux_x86_64/23.3/comm_libs/openmpi4/openmpi-4.0
 MPI_LINK=-L/proj/nv/libraries/Linux_x86_64/23.3/openmpi4/224180-rel-1/lib -Wl,-rpath -Wl,$$ORIGIN:$$ORIGIN/../../lib:$$ORIGIN/../../../lib:$$ORIGIN/../../../compilers/lib:$$ORIGIN/../../../../compilers/lib:$$ORIGIN/../../../../../compilers/lib -Wl,-rpath -Wl,/proj/nv/libraries/Linux_x86_64/23.3/openmpi4/224180-rel-1/lib -Wl,-rpath -Wl,/work2/cuda/hpc_sdk/Linux_x86_64/23.3/comm_libs/openmpi4/openmpi-4.0.5/lib -L/work2/cuda/hpc_sdk/Linux_x86_64/23.3/comm_libs/openmpi4/openmpi-4.0.5/lib -lmpi -lmpi_cxx
 
 
-OMP_FLAGS=-cuda -mp=gpu -Minfo=mp,accel -DENABLE_OMP -DENABLE_CUDA
+OMP_FLAGS=-cuda -mp=gpu -Minfo=mp,accel -DNEWTONPP_ENABLE_OMP -DNEWTONPP_ENABLE_CUDA
 OMP_LINK=
 
 CFLAGS=-lm -Wall -Wextra -fPIC
@@ -28,7 +28,7 @@ CUDA_LIBS=/work2/cuda/hpc_sdk/Linux_x86_64/23.3/cuda/12.0/lib64/
 
 nfoSENSEI=/work/SENSEI/sensei-svtk-install
 ifneq ($(USE_SENSEI),)
-	CFLAGS += -DENABLE_SENSEI
+	CFLAGS += -DNEWTONPP_ENABLE_SENSEI
 	SENSEI_LINK=`${SENSEI}/bin/sensei_config --libs`
 	SENSEI_FLAGS=`${SENSEI}/bin/sensei_config --cflags`
 	SENSEI_PYTHON_DIR=`${SENSEI}/bin/sensei_config --python-dir`

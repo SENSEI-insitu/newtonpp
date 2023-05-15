@@ -7,7 +7,7 @@
 inline constexpr hamr::buffer_allocator cpu_alloc() { return hamr::buffer_allocator::malloc; }
 inline constexpr hamr::buffer_allocator gpu_alloc() { return hamr::buffer_allocator::openmp; }
 
-#if defined(ENABLE_OMP)
+#if defined(NEWTONPP_ENABLE_OMP)
 inline constexpr hamr::buffer_allocator def_alloc() { return gpu_alloc(); }
 #else
 inline constexpr hamr::buffer_allocator def_alloc() { return cpu_alloc(); }

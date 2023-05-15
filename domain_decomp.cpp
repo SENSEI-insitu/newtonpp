@@ -289,7 +289,7 @@ void package(const patch_data &pdi, const patch_force &pfi,
     // copy them
     int no = 0;
 
-#if defined(ENABLE_CUDA)
+#if defined(NEWTONPP_ENABLE_CUDA)
     int threads_per_block = 512;
     cuda::stream_compact(
         pdo.m_m.data(),

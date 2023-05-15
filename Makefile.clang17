@@ -16,7 +16,7 @@
 MPI_FLAGS=-I/usr/include/mpich-x86_64
 MPI_LINK= -L/usr/lib64/mpich/lib -Wl,-rpath -Wl,/usr/lib64/mpich/lib -Wl,--enable-new-dtags -lmpi
 
-OMP_FLAGS=-DENABLE_OMP -DENABLE_CUDA -fopenmp -fopenmp-targets=nvptx64 -Xopenmp-target=nvptx64 --offload-arch=sm_75
+OMP_FLAGS=-DNEWTONPP_ENABLE_OMP -DNEWTONPP_ENABLE_CUDA -fopenmp -fopenmp-targets=nvptx64 -Xopenmp-target=nvptx64 --offload-arch=sm_75
 OMP_LINK=-Wl,-rpath=/home/bloring/work/llvm/llvm-install/lib -L/home/bloring/work/llvm/llvm-install/lib
 
 CFLAGS=-Wall -Wextra -fPIE -std=c++17

@@ -10,7 +10,7 @@ MPI_FLAGS=-I/usr/include/mpich-x86_64
 MPI_LINK=-L/usr/lib64/mpich/lib -Wl,-rpath -Wl,/usr/lib64/mpich/lib -Wl,--enable-new-dtags -lmpi
 
 # for debug build add :  -Xarch_host -g -Xarch_host -O0
-OMP_FLAGS=-DENABLE_OMP -DENABLE_CUDA -fopenmp -fopenmp-targets=nvptx64 -Xopenmp-target=nvptx64 --offload-arch=sm_75 -Xarch_host -g -Xarch_host -O3
+OMP_FLAGS=-DNEWTONPP_ENABLE_OMP -DNEWTONPP_ENABLE_CUDA -fopenmp -fopenmp-targets=nvptx64 -Xopenmp-target=nvptx64 --offload-arch=sm_75 -Xarch_host -g -Xarch_host -O3
 OMP_LINK=
 
 CFLAGS=-Wall -Wextra -fPIE -std=c++17
@@ -25,7 +25,7 @@ CUDA_LINK=
 
 SENSEI=/work/SENSEI/sensei-svtk-install
 ifneq ($(USE_SENSEI),)
-	CFLAGS += -DENABLE_SENSEI
+	CFLAGS += -DNEWTONPP_ENABLE_SENSEI
 	SENSEI_LINK=`${SENSEI}/bin/sensei_config --libs`
 	SENSEI_FLAGS=`${SENSEI}/bin/sensei_config --cflags`
 	SENSEI_PYTHON_DIR=`${SENSEI}/bin/sensei_config --python-dir`
@@ -41,7 +41,7 @@ HAMR_FLAGS=-I$(HAMR)/include
 HAMR_LINK=$(HAMR)/lib64/libhamr.a
 
 ifneq ($(USE_MAGI),)
-	CFLAGS += -DENABLE_MAGI
+	CFLAGS += -DNEWTONPP_ENABLE_MAGI
 	HDF5_FLAGS=-I/usr/include/mpich-x86_64
 	HDF5_LINK=-L/usr/lib64/mpich/lib -lhdf5
 endif

@@ -18,7 +18,7 @@ USE_SENSEI=
 MPI_FLAGS=-I/usr/include/mpich-x86_64
 MPI_LINK= -L/usr/lib64/mpich/lib -Wl,-rpath -Wl,/usr/lib64/mpich/lib -Wl,--enable-new-dtags -lmpi
 
-OMP_FLAGS=-DENABLE_OMP -DENABLE_CUDA -fopenmp -foffload=nvptx-none -foffload-options=nvptx-none=-march=sm_75 -foffload=-lm -foffload=-latomic -fno-fast-math -fno-associative-math
+OMP_FLAGS=-DNEWTONPP_ENABLE_OMP -DNEWTONPP_ENABLE_CUDA -fopenmp -foffload=nvptx-none -foffload-options=nvptx-none=-march=sm_75 -foffload=-lm -foffload=-latomic -fno-fast-math -fno-associative-math
 OMP_LINK=-latomic -lgomp -lrt
 
 
