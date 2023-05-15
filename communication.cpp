@@ -16,7 +16,12 @@ void isend_mp(MPI_Comm comm, const patch_data &pd, int dest, int tag, requests &
     {
         reqs.m_size = 4;
 
+#if defined(NEWTONPP_GPU_DIRECT)
+        auto [pm, px, py, pz] = pd.get_mp_data();
+#else
         auto [spm, pm, spx, px, spy, py, spz, pz] = pd.get_mp_cpu_accessible();
+        reqs.m_data = {spm, spx, spy, spz};
+#endif
 
         MPI_Request *req = reqs.m_req;
 
@@ -24,8 +29,6 @@ void isend_mp(MPI_Comm comm, const patch_data &pd, int dest, int tag, requests &
         MPI_Isend(px, n, MPI_DOUBLE, dest, ++tag, comm, ++req);
         MPI_Isend(py, n, MPI_DOUBLE, dest, ++tag, comm, ++req);
         MPI_Isend(pz, n, MPI_DOUBLE, dest, ++tag, comm, ++req);
-
-        reqs.m_data = {spm, spx, spy, spz};
     }
 }
 
@@ -39,10 +42,15 @@ void recv_mp(MPI_Comm comm, patch_data &pd, int src, int tag)
 
     if (n)
     {
-        hamr::buffer<double> m(hamr::buffer_allocator::malloc, n);
-        hamr::buffer<double> x(hamr::buffer_allocator::malloc, n);
-        hamr::buffer<double> y(hamr::buffer_allocator::malloc, n);
-        hamr::buffer<double> z(hamr::buffer_allocator::malloc, n);
+#if defined(NEWTONPP_GPU_DIRECT)
+        auto alloc = gpu_alloc();
+#else
+        auto alloc = cpu_alloc();
+#endif
+        hamr::buffer<double> m(alloc, n);
+        hamr::buffer<double> x(alloc, n);
+        hamr::buffer<double> y(alloc, n);
+        hamr::buffer<double> z(alloc, n);
 
         MPI_Recv(m.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
         MPI_Recv(x.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
@@ -61,7 +69,11 @@ void isend(MPI_Comm comm, const patch_force &pf, int dest, int tag)
 {
     long n = pf.size();
 
+#if defined(NEWTONPP_GPU_DIRECT)
+    auto [pf_u, pf_v, pf_w] = pf.get_data();
+#else
     auto [spf_u, pf_u, spf_v, pf_v, spf_w, pf_w] = pf.get_cpu_accessible();
+#endif
 
     MPI_Send(&n, 1, MPI_LONG, dest, ++tag, comm);
     MPI_Send(pf_u, n, MPI_DOUBLE, dest, ++tag, comm);
@@ -77,9 +89,14 @@ void recv(MPI_Comm comm, patch_force &pf, int src, int tag)
 
     assert(pf.size() == n);
 
-    hamr::buffer<double> pf_u(hamr::buffer_allocator::malloc, n);
-    hamr::buffer<double> pf_v(hamr::buffer_allocator::malloc, n);
-    hamr::buffer<double> pf_w(hamr::buffer_allocator::malloc, n);
+#if defined(NEWTONPP_GPU_DIRECT)
+        auto alloc = gpu_alloc();
+#else
+        auto alloc = cpu_alloc();
+#endif
+    hamr::buffer<double> pf_u(alloc, n);
+    hamr::buffer<double> pf_v(alloc, n);
+    hamr::buffer<double> pf_w(alloc, n);
 
     MPI_Recv(pf_u.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
     MPI_Recv(pf_v.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
@@ -100,19 +117,17 @@ void isend(MPI_Comm comm, const patch_data &pd,
 
     if (n)
     {
-        auto [spd_m, pd_m,
-              spd_x, pd_x,
-              spd_y, pd_y,
-              spd_z, pd_z,
-              spd_u, pd_u,
-              spd_v, pd_v,
-              spd_w, pd_w] = pd.get_cpu_accessible();
+#if defined(NEWTONPP_GPU_DIRECT)
+        auto [pd_m, pd_x, pd_y, pd_z, pd_u, pd_v, pd_w] = pd.get_data();
+        auto [pf_u, pf_v, pf_w] = pf.get_data();
+#else
+        auto [spd_m, pd_m, spd_x, pd_x, spd_y, pd_y, spd_z, pd_z,
+              spd_u, pd_u, spd_v, pd_v, spd_w, pd_w] = pd.get_cpu_accessible();
 
-        auto [spf_u, pf_u,
-              spf_v, pf_v,
-              spf_w, pf_w] = pf.get_cpu_accessible();
+        auto [spf_u, pf_u, spf_v, pf_v, spf_w, pf_w] = pf.get_cpu_accessible();
 
         reqs.m_data = {spd_m, spd_x, spd_y, spd_z, spd_u, spd_v, spd_w, spf_u, spf_v, spf_w};
+#endif
 
         reqs.m_size = 10;
         MPI_Request *req = reqs.m_req;
@@ -141,16 +156,21 @@ void recv(MPI_Comm comm, patch_data &pd, patch_force &pf, int src, int tag)
 
     if (n)
     {
-        hamr::buffer<double> tpd_m(cpu_alloc(), n);
-        hamr::buffer<double> tpd_x(cpu_alloc(), n);
-        hamr::buffer<double> tpd_y(cpu_alloc(), n);
-        hamr::buffer<double> tpd_z(cpu_alloc(), n);
-        hamr::buffer<double> tpd_u(cpu_alloc(), n);
-        hamr::buffer<double> tpd_v(cpu_alloc(), n);
-        hamr::buffer<double> tpd_w(cpu_alloc(), n);
-        hamr::buffer<double> tpf_u(cpu_alloc(), n);
-        hamr::buffer<double> tpf_v(cpu_alloc(), n);
-        hamr::buffer<double> tpf_w(cpu_alloc(), n);
+#if defined(NEWTONPP_GPU_DIRECT)
+        auto alloc = gpu_alloc();
+#else
+        auto alloc = cpu_alloc();
+#endif
+        hamr::buffer<double> tpd_m(alloc, n);
+        hamr::buffer<double> tpd_x(alloc, n);
+        hamr::buffer<double> tpd_y(alloc, n);
+        hamr::buffer<double> tpd_z(alloc, n);
+        hamr::buffer<double> tpd_u(alloc, n);
+        hamr::buffer<double> tpd_v(alloc, n);
+        hamr::buffer<double> tpd_w(alloc, n);
+        hamr::buffer<double> tpf_u(alloc, n);
+        hamr::buffer<double> tpf_v(alloc, n);
+        hamr::buffer<double> tpf_w(alloc, n);
 
         MPI_Recv(tpd_m.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
         MPI_Recv(tpd_x.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);

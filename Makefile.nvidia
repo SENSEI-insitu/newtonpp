@@ -2,6 +2,7 @@
 #module load /work2/cuda/hpc_sdk/modulefiles/nvhpc/23.3
 
 USE_SENSEI=
+USE_GPU_DIRECT=
 
 CXX=`which nvc++`
 
@@ -42,6 +43,10 @@ else
 endif
 HAMR_FLAGS=-I$(HAMR)/include
 HAMR_LINK=$(HAMR)/lib64/libhamr.a
+
+ifneq ($(USE_GPU_DIRECT),)
+	CFLAGS += -DNEWTONPP_GPU_DIRECT
+endif
 
 
 .PHONY: all

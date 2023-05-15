@@ -34,7 +34,12 @@ using timer = std::chrono::high_resolution_clock;
 #pragma message("Stream compact on the CPU")
 #endif
 
-#define DEBUG_IC
+#if defined(NEWTONPP_GPU_DIRECT)
+#pragma message("GPU direct is used for MPI communication")
+#else
+#pragma message("Data copy to the CPU for MPI communication")
+#endif
+
 
 int main(int argc, char **argv)
 {
