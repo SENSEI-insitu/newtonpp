@@ -5,14 +5,18 @@ USE_SENSEI=
 
 CXX=`which nvc++`
 
+# default
+#MPI_FLAGS=-I/work2/cuda/hpc_sdk/Linux_x86_64/23.3/comm_libs/openmpi/openmpi-3.1.5/include
+#MPI_LINK=-Wl,-rpath -Wl,$$ORIGIN:$$ORIGIN/../../lib:$$ORIGIN/../../../lib:$$ORIGIN/../../../compilers/lib:$$ORIGIN/../../../../compilers/lib:$$ORIGIN/../../../../../compilers/lib -Wl,-rpath -Wl,/work2/cuda/hpc_sdk/Linux_x86_64/23.3/comm_libs/openmpi/openmpi-3.1.5/lib -L/work2/cuda/hpc_sdk/Linux_x86_64/23.3/comm_libs/openmpi/openmpi-3.1.5/lib -lmpi -lmpi_cxx
 
-MPI_FLAGS=-I/usr/include/mpich-x86_64 -L/usr/lib64/mpich/lib -Wl,-rpath -Wl,/usr/lib64/mpich/lib -Wl,--enable-new-dtags -lmpi
-MPI_LINK= -L/usr/lib64/mpich/lib -Wl,-rpath -Wl,/usr/lib64/mpich/lib -Wl,--enable-new-dtags -lmpi
+MPI_FLAGS=-I/work2/cuda/hpc_sdk/Linux_x86_64/23.3/comm_libs/openmpi4/openmpi-4.0.5/include
+MPI_LINK=-L/proj/nv/libraries/Linux_x86_64/23.3/openmpi4/224180-rel-1/lib -Wl,-rpath -Wl,$$ORIGIN:$$ORIGIN/../../lib:$$ORIGIN/../../../lib:$$ORIGIN/../../../compilers/lib:$$ORIGIN/../../../../compilers/lib:$$ORIGIN/../../../../../compilers/lib -Wl,-rpath -Wl,/proj/nv/libraries/Linux_x86_64/23.3/openmpi4/224180-rel-1/lib -Wl,-rpath -Wl,/work2/cuda/hpc_sdk/Linux_x86_64/23.3/comm_libs/openmpi4/openmpi-4.0.5/lib -L/work2/cuda/hpc_sdk/Linux_x86_64/23.3/comm_libs/openmpi4/openmpi-4.0.5/lib -lmpi -lmpi_cxx
 
-OMP_FLAGS=-mp=gpu -DENABLE_OMP -DENABLE_CUDA
+
+OMP_FLAGS=-cuda -mp=gpu -Minfo=mp,accel -DENABLE_OMP -DENABLE_CUDA
 OMP_LINK=
 
-CFLAGS=-lm -Wall -Wextra -fPIE
+CFLAGS=-lm -Wall -Wextra -fPIC
 CLINK=-lm -lstdc++
 
 C_OPT_FLAGS=-O3 -march=native -mtune=native
@@ -22,7 +26,7 @@ CUDA_XOPT_FLAGS=-O3,-march=native,-mtune=native
 
 CUDA_LIBS=/work2/cuda/hpc_sdk/Linux_x86_64/23.3/cuda/12.0/lib64/
 
-SENSEI=/work/SENSEI/sensei-svtk-install
+nfoSENSEI=/work/SENSEI/sensei-svtk-install
 ifneq ($(USE_SENSEI),)
 	CFLAGS += -DENABLE_SENSEI
 	SENSEI_LINK=`${SENSEI}/bin/sensei_config --libs`
@@ -34,7 +38,7 @@ endif
 ifneq ($(USE_SENSEI),)
 	HAMR=$(SENSEI)/
 else
-	HAMR=/work/SENSEI/HAMR-nv_omp/
+	HAMR=/work/SENSEI/HAMR-install-nvhpc/
 endif
 HAMR_FLAGS=-I$(HAMR)/include
 HAMR_LINK=$(HAMR)/lib64/libhamr.a
@@ -75,7 +79,7 @@ newtonpp_nv_omp:  stream_compact.a $(newtonpp_objs) newton.cpp
 	$(CXX) $(OMP_FLAGS) $(MPI_FLAGS) $(CFLAGS) \
 	$(C_OPT_FLAGS) $(HAMR_FLAGS) $(SENSEI_FLAGS) -I./ \
 	newton.cpp $(newtonpp_objs) \
-	stream_compact.a ${CUDA}/libcudart_static.a \
+	stream_compact.a -lcudart  \
 	$(SENSEI_LINK) $(HAMR_LINK) $(CLINK) $(MPI_LINK) $(OMP_LINK) \
 	-o newtonpp_nv_omp
 

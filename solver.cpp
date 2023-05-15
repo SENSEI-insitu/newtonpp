@@ -27,14 +27,22 @@ void forces(const patch_data &pd, patch_force &pf, double G, double eps)
     double *pf_w = pf.m_w.data();
 #endif
 
+#if defined(__NVCOMPILER)
+    #pragma omp target teams loop is_device_ptr(pf_u,pf_v,pf_w,pd_m,pd_x,pd_y,pd_z)
+#else
     #pragma omp target teams distribute is_device_ptr(pf_u,pf_v,pf_w,pd_m,pd_x,pd_y,pd_z)
+#endif
     for (long i = 0; i < n; ++i)
     {
         double fx = 0.;
         double fy = 0.;
         double fz = 0.;
 
+#if defined(__NVCOMPILER)
+        #pragma omp loop reduction(+: fx,fy,fz)
+#else
         #pragma omp parallel for reduction(+: fx,fy,fz)
+#endif
         for (long j = 0; j < n; ++j)
         {
             double rx = pd_x[j] - pd_x[i];
@@ -87,14 +95,22 @@ void forces(const patch_data &lpd, const patch_data &rpd, patch_force &pf, doubl
     double *pf_w = pf.m_w.data();
 #endif
 
+#if defined(__NVCOMPILER)
+    #pragma omp target teams loop is_device_ptr(pf_u,pf_v,pf_w,lpd_m,lpd_x,lpd_y,lpd_z, rpd_m,rpd_x,rpd_y,rpd_z)
+#else
     #pragma omp target teams distribute is_device_ptr(pf_u,pf_v,pf_w,lpd_m,lpd_x,lpd_y,lpd_z, rpd_m,rpd_x,rpd_y,rpd_z)
+#endif
     for (long i = 0; i < n; ++i)
     {
         double fx = 0.;
         double fy = 0.;
         double fz = 0.;
 
+#if defined(__NVCOMPILER)
+        #pragma omp loop reduction(+: fx,fy,fz)
+#else
         #pragma omp parallel for reduction(+: fx,fy,fz)
+#endif
         for (long j = 0; j < m; ++j)
         {
             double rx = rpd_x[j] - lpd_x[i];
@@ -219,7 +235,11 @@ void velocity_verlet(MPI_Comm comm,
     double *pf_w = pf.m_w.data();
 #endif
 
+#if defined(__NVCOMPILER)
+    #pragma omp target teams loop is_device_ptr(pd_m,pd_x,pd_y,pd_z,pd_u,pd_v,pd_w,pf_u,pf_v,pf_w)
+#else
     #pragma omp target teams distribute parallel for is_device_ptr(pd_m,pd_x,pd_y,pd_z,pd_u,pd_v,pd_w,pf_u,pf_v,pf_w)
+#endif
     for (long i = 0; i < n; ++i)
     {
         // half step velocity
@@ -236,7 +256,11 @@ void velocity_verlet(MPI_Comm comm,
     // update the forces
     forces(comm, pd, pf, G, eps, nf);
 
+#if defined(__NVCOMPILER)
+    #pragma omp target teams loop is_device_ptr(pd_m,pd_u,pd_v,pd_w,pf_u,pf_v,pf_w)
+#else
     #pragma omp target teams distribute parallel for is_device_ptr(pd_m,pd_u,pd_v,pd_w,pf_u,pf_v,pf_w)
+#endif
     for (long i = 0; i < n; ++i)
     {
         // half step velocity
