@@ -81,7 +81,12 @@ int parse_command_line(int argc, char **argv, MPI_Comm comm,
             {
                 magi_file = argv[++q];
                 if (rank == 0)
+#ifdef ENABLE_MAGI
                     std::cerr << "initializing from " << magi_file << std::endl;
+#else
+                    std::cerr << "hdf5 is required for magi initial conditions" << std::endl;
+                abort();
+#endif
             }
             else if(strcmp(argv[q], "--out_dir") == 0)
             {
