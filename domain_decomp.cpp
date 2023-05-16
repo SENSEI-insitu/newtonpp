@@ -216,7 +216,7 @@ void partition(MPI_Comm comm, const std::vector<patch> &ps,
 
     // initialize to out of bounds. if a particle is not inside any patch
     // it will be removed from the simulation
-#if defined(__NVCOMPILER)
+#if defined(NEWTONPP_USE_OMP_LOOP)
     #pragma omp target teams loop is_device_ptr(pdest)
 #else
     #pragma omp target teams distribute parallel for is_device_ptr(pdest)
@@ -242,7 +242,7 @@ void partition(MPI_Comm comm, const std::vector<patch> &ps,
         const double *p_x = ps[j].m_x.data();
 
         // test each body to see if it's inside this patch
-#if defined(__NVCOMPILER)
+#if defined(NEWTONPP_USE_OMP_LOOP)
         #pragma omp target teams loop is_device_ptr(pd_x,pd_y,pd_z,p_x,pdest)
 #else
         #pragma omp target teams distribute parallel for is_device_ptr(pd_x,pd_y,pd_z,p_x,pdest)
@@ -272,7 +272,7 @@ void package(const patch_data &pdi, const patch_force &pfi,
     const int *pdest = dest.data();
 
     // ideintify the bodies that are owned by the specified rank
-#if defined(__NVCOMPILER)
+#if defined(NEWTONPP_USE_OMP_LOOP)
     #pragma omp target teams loop is_device_ptr(pmask,pdest)
 #else
     #pragma omp target teams distribute parallel for is_device_ptr(pmask,pdest)

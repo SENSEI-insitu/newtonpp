@@ -109,7 +109,7 @@ void reduce(const patch_data &pdi, patch_data &pdo)
     z = 0.;
     }
 
-#if defined(__NVCOMPILER)
+#if defined(NEWTONPP_USE_OMP_LOOP)
     #pragma omp target teams loop reduction(+: m,x,y,z), is_device_ptr(mi,xi,yi,zi), map(alloc: m,x,y,z)
 #else
     #pragma omp target teams distribute parallel for reduction(+: m,x,y,z), is_device_ptr(mi,xi,yi,zi), map(alloc: m,x,y,z)

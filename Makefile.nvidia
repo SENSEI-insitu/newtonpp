@@ -3,6 +3,7 @@
 
 USE_SENSEI=
 USE_GPU_DIRECT=
+USE_OMP_LOOP=1
 
 CXX=`which nvc++`
 
@@ -46,6 +47,10 @@ HAMR_LINK=$(HAMR)/lib64/libhamr.a
 
 ifneq ($(USE_GPU_DIRECT),)
 	CFLAGS += -DNEWTONPP_GPU_DIRECT
+endif
+
+ifneq ($(USE_OMP_LOOP),)
+	CFLAGS += -DNEWTONPP_USE_OMP_LOOP
 endif
 
 

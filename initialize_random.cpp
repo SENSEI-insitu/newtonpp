@@ -66,7 +66,7 @@ void initialize_random(MPI_Comm comm, long n, const patch &dom,
     double *pd_w = pd.m_w.data();
 #endif
 
-#if defined(__NVCOMPILER)
+#if defined(NEWTONPP_USE_OMP_LOOP)
     #pragma omp target teams loop is_device_ptr(p_x,pd_m,pd_x,pd_y,pd_z,pd_u,pd_v,pd_w), map(to:prm[0:n],prx[0:n],pry[0:n],prz[0:n],prv[0:n])
 #else
     #pragma omp target teams distribute parallel for is_device_ptr(p_x,pd_m,pd_x,pd_y,pd_z,pd_u,pd_v,pd_w), map(to:prm[0:n],prx[0:n],pry[0:n],prz[0:n],prv[0:n])

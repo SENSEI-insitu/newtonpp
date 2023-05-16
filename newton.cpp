@@ -40,6 +40,12 @@ using timer = std::chrono::high_resolution_clock;
 #pragma message("Data copy to the CPU for MPI communication")
 #endif
 
+#if defined(NEWTONPP_USE_OMP_LOOP)
+#pragma message("OpenMP offload directive: target teams loop")
+#else
+#pragma message("OpenMP offload directive: target teams distribute parallel for")
+#endif
+
 
 int main(int argc, char **argv)
 {

@@ -63,7 +63,7 @@ void GetMinMax(const hamr::buffer<double> &buf, long n_elem, double &mn, double 
 
     const double *pbuf = buf.data();
 
-#if defined(__NVCOMPILER)
+#if defined(NEWTONPP_USE_OMP_LOOP)
     #pragma omp target teams loop is_device_ptr(pbuf), reduction(min:mn), reduction(max:mx)
 #else
     #pragma omp target teams distribute parallel for is_device_ptr(pbuf), reduction(min:mn), reduction(max:mx)
