@@ -1,0 +1,4 @@
+<sensei>
+  <analysis type="histogram" mesh="bodies_ug" array="vu"
+     association="point" bins="10" enabled="1" />
+</sensei>
