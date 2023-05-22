@@ -169,16 +169,16 @@ int sensei_adaptor::GetMeshMetadata(unsigned int id, sensei::MeshMetadataPtr &md
     else
     {
         md->NumArrays = 11;
-                         "vu", "vv", "vw", "fu", "fv", "fw"};
         md->ArrayName = {"owner", "m", "x", "y", "z",
+                         "vu", "vv", "vw", "id", "fu", "fv", "fw"};
 
-        md->ArrayCentering = {pCen, pCen, pCen, pCen, pCen,
+        md->ArrayCentering = {pCen, pCen, pCen, pCen, pCen, pCen,
                               pCen, pCen, pCen, pCen, pCen, pCen};
 
-        md->ArrayComponents = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+        md->ArrayComponents = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
         md->ArrayType = {i32, f64, f64, f64, f64,
-                         f64, f64, f64, f64, f64, f64};
+                         f64, f64, f64, i32, f64, f64, f64};
     }
 
 
@@ -258,6 +258,11 @@ int sensei_adaptor::GetMeshMetadata(unsigned int id, sensei::MeshMetadataPtr &md
 
             // vw
             GetMinMax(m_bodies->m_w, nb, mn, mx);
+            md->ArrayRange.push_back({{mn, mx}});
+            md->BlockArrayRange.push_back({{mn, mx}});
+
+            // id
+            GetMinMax(m_bodies->m_id, nb, mn, mx);
             md->ArrayRange.push_back({{mn, mx}});
             md->BlockArrayRange.push_back({{mn, mx}});
 
@@ -502,6 +507,7 @@ int sensei_adaptor::AddArray(svtkDataObject* mesh,
     {
         if ((arrayName == "owner") && (association == cCen))
         {
+            // fill a CPU backed VTK data array with the rank
             auto ug = dynamic_cast<svtkUnstructuredGrid*>(mbds->GetBlock(rank));
             if (ug)
             {
@@ -528,14 +534,24 @@ int sensei_adaptor::AddArray(svtkDataObject* mesh,
 
             if (arrayName == "owner")
             {
+                // fill a CPU backed VTK data array with the rank
                 auto ao = svtkIntArray::New();
                 ao->SetName("owner");
                 ao->SetNumberOfTuples(nb);
                 ao->FillValue(rank);
                 aout = ao;
             }
+            else if (arrayName == "id")
+            {
+                // zero-copy construct the VTK data array
+                auto buf = &m_pd->m_id;
+                aout = svtkHAMRIntArray::New(arrayName, buf->pointer(), nb, 1,
+                         buf->get_allocator(), buf->get_stream(), buf->get_transfer_mode(),
+                         buf->get_owner());
+            }
             else
             {
+                // zero-copy construct the VTK data array
                 auto buf = GetBuffer(arrayName, m_bodies, m_body_forces);
                 if (buf)
                 {
@@ -547,9 +563,10 @@ int sensei_adaptor::AddArray(svtkDataObject* mesh,
 
             if (aout)
             {
-               tab->AddColumn(aout);
-               aout->Delete();
-               return 0;
+                // the request for the array succeeded
+                tab->AddColumn(aout);
+                aout->Delete();
+                return 0;
             }
         }
     }

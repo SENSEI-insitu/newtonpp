@@ -1,21 +1,18 @@
 
 #module load /work2/cuda/hpc_sdk/modulefiles/nvhpc/23.3
 
-USE_SENSEI=
+USE_MAGI=1
+USE_SENSEI=1
 USE_GPU_DIRECT=
 USE_OMP_LOOP=1
 
 CXX=`which nvc++`
 
-# default
-#MPI_FLAGS=-I/work2/cuda/hpc_sdk/Linux_x86_64/23.3/comm_libs/openmpi/openmpi-3.1.5/include
-#MPI_LINK=-Wl,-rpath -Wl,$$ORIGIN:$$ORIGIN/../../lib:$$ORIGIN/../../../lib:$$ORIGIN/../../../compilers/lib:$$ORIGIN/../../../../compilers/lib:$$ORIGIN/../../../../../compilers/lib -Wl,-rpath -Wl,/work2/cuda/hpc_sdk/Linux_x86_64/23.3/comm_libs/openmpi/openmpi-3.1.5/lib -L/work2/cuda/hpc_sdk/Linux_x86_64/23.3/comm_libs/openmpi/openmpi-3.1.5/lib -lmpi -lmpi_cxx
+# OpenMPI 3
+MPI_FLAGS=-I/work2/cuda/hpc_sdk/Linux_x86_64/23.3/comm_libs/openmpi/openmpi-3.1.5/include
+MPI_LINK=-Wl,-rpath -Wl,$$ORIGIN:$$ORIGIN/../../lib:$$ORIGIN/../../../lib:$$ORIGIN/../../../compilers/lib:$$ORIGIN/../../../../compilers/lib:$$ORIGIN/../../../../../compilers/lib -Wl,-rpath -Wl,/work2/cuda/hpc_sdk/Linux_x86_64/23.3/comm_libs/openmpi/openmpi-3.1.5/lib -L/work2/cuda/hpc_sdk/Linux_x86_64/23.3/comm_libs/openmpi/openmpi-3.1.5/lib -lmpi -lmpi_cxx
 
-MPI_FLAGS=-I/work2/cuda/hpc_sdk/Linux_x86_64/23.3/comm_libs/openmpi4/openmpi-4.0.5/include
-MPI_LINK=-L/proj/nv/libraries/Linux_x86_64/23.3/openmpi4/224180-rel-1/lib -Wl,-rpath -Wl,$$ORIGIN:$$ORIGIN/../../lib:$$ORIGIN/../../../lib:$$ORIGIN/../../../compilers/lib:$$ORIGIN/../../../../compilers/lib:$$ORIGIN/../../../../../compilers/lib -Wl,-rpath -Wl,/proj/nv/libraries/Linux_x86_64/23.3/openmpi4/224180-rel-1/lib -Wl,-rpath -Wl,/work2/cuda/hpc_sdk/Linux_x86_64/23.3/comm_libs/openmpi4/openmpi-4.0.5/lib -L/work2/cuda/hpc_sdk/Linux_x86_64/23.3/comm_libs/openmpi4/openmpi-4.0.5/lib -lmpi -lmpi_cxx
-
-
-OMP_FLAGS=-cuda -mp=gpu -Minfo=mp,accel -DNEWTONPP_ENABLE_OMP -DNEWTONPP_ENABLE_CUDA
+OMP_FLAGS=-cuda -mp=gpu -DNEWTONPP_ENABLE_OMP -DNEWTONPP_ENABLE_CUDA
 OMP_LINK=
 
 CFLAGS=-lm -Wall -Wextra -fPIC
@@ -28,7 +25,13 @@ CUDA_XOPT_FLAGS=-O3,-march=native,-mtune=native
 
 CUDA_LIBS=/work2/cuda/hpc_sdk/Linux_x86_64/23.3/cuda/12.0/lib64/
 
-nfoSENSEI=/work/SENSEI/sensei-svtk-install
+ifneq ($(USE_MAGI),)
+	CFLAGS += -DNEWTONPP_ENABLE_MAGI
+	HDF5_FLAGS=-I/work/SENSEI/hdf5-1.14.1-2-install/include
+	HDF5_LINK=-L/work/SENSEI/hdf5-1.14.1-2-install/lib -lhdf5
+endif
+
+SENSEI=/work/SENSEI/sensei-svtk-install-nvhpc
 ifneq ($(USE_SENSEI),)
 	CFLAGS += -DNEWTONPP_ENABLE_SENSEI
 	SENSEI_LINK=`${SENSEI}/bin/sensei_config --libs`
@@ -74,7 +77,7 @@ stream_compact.a: stream_compact.cu stream_compact.cxx
 
 
 %.o: %.cpp
-	$(CXX) $(OMP_FLAGS) $(MPI_FLAGS) $(CFLAGS) $(C_OPT_FLAGS) $(HAMR_FLAGS) $(SENSEI_FLAGS) -I./ -c $< -o $@
+	$(CXX) $(CFLAGS) $(C_OPT_FLAGS) $(OMP_FLAGS) $(MPI_FLAGS) $(HDF5_FLAGS) $(HAMR_FLAGS) $(SENSEI_FLAGS) -I./ -c $< -o $@
 
 
 newtonpp_objs=domain_decomp.o initialize_file.o patch_data.o communication.o \
@@ -84,13 +87,16 @@ ifneq ($(USE_SENSEI),)
 	newtonpp_objs += sensei_adaptor.o insitu.o
 endif
 
+ifneq ($(USE_MAGI),)
+	newtonpp_objs += read_magi.o
+endif
 
 newtonpp_nv_omp:  stream_compact.a $(newtonpp_objs) newton.cpp
-	$(CXX) $(OMP_FLAGS) $(MPI_FLAGS) $(CFLAGS) \
+	$(CXX) $(OMP_FLAGS) $(MPI_FLAGS) $(HDF5_FLAGS) $(CFLAGS) \
 	$(C_OPT_FLAGS) $(HAMR_FLAGS) $(SENSEI_FLAGS) -I./ \
 	newton.cpp $(newtonpp_objs) \
 	stream_compact.a -lcudart  \
-	$(SENSEI_LINK) $(HAMR_LINK) $(CLINK) $(MPI_LINK) $(OMP_LINK) \
+	$(SENSEI_LINK) $(HAMR_LINK) $(CLINK) $(MPI_LINK) $(HDF5_LINK) $(OMP_LINK) \
 	-o newtonpp_nv_omp
 
 

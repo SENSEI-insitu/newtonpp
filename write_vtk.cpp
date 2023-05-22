@@ -29,9 +29,8 @@ void write_vtk(MPI_Comm comm, const patch_data &pd, const patch_force &pf, const
     int rank = 0;
     MPI_Comm_rank(comm, &rank);
 
-    auto [spd_m, pd_m,
-          spd_x, pd_x, spd_y, pd_y, spd_z, pd_z,
-          spd_u, pd_u, spd_v, pd_v, spd_w, pd_w] = pd.get_cpu_accessible();
+    auto [spd_m, pd_m, spd_x, pd_x, spd_y, pd_y, spd_z, pd_z,
+          spd_u, pd_u, spd_v, pd_v, spd_w, pd_w, spd_id, pd_id] = pd.get_cpu_accessible();
 
     auto [spf_u, pf_u, spf_v, pf_v, spf_w, pf_w] = pf.get_cpu_accessible();
 
@@ -46,8 +45,9 @@ void write_vtk(MPI_Comm comm, const patch_data &pd, const patch_force &pf, const
     std::vector<double> fu(n);
     std::vector<double> fv(n);
     std::vector<double> fw(n);
+    std::vector<int> id(n);
     std::vector<int> r(n);
-    std::vector<int> id(2*n);
+    std::vector<int> cid(2*n);
 
     for (long i = 0; i < n; ++i)
     {
@@ -60,14 +60,17 @@ void write_vtk(MPI_Comm comm, const patch_data &pd, const patch_force &pf, const
         vu[i] = pd_u[i];
         vv[i] = pd_v[i];
         vw[i] = pd_w[i];
+        id[i] = pd_id[i];
+
         fu[i] = pf_u[i];
         fv[i] = pf_v[i];
         fw[i] = pf_w[i];
+
         r[i] = rank;
 
         ii = 2*i;
-        id[ii    ] = 1;
-        id[ii + 1] = i;
+        cid[ii    ] = 1;
+        cid[ii + 1] = i;
     }
 
     // convert to big endian (required by vtk)
@@ -91,6 +94,10 @@ void write_vtk(MPI_Comm comm, const patch_data &pd, const patch_force &pf, const
     for (size_t i = 0; i < vw.size(); ++i)
         pvw[i] = __builtin_bswap64(pvw[i]);
 
+    uint32_t *pid = (uint32_t*)id.data();
+    for (size_t i = 0; i < id.size(); ++i)
+        pid[i] = __builtin_bswap32(pid[i]);
+
     uint64_t *pfu = (uint64_t*)fu.data();
     for (size_t i = 0; i < fu.size(); ++i)
         pfu[i] = __builtin_bswap64(pfu[i]);
@@ -107,9 +114,9 @@ void write_vtk(MPI_Comm comm, const patch_data &pd, const patch_force &pf, const
     for (size_t i = 0; i < r.size(); ++i)
         pr[i] = __builtin_bswap32(pr[i]);
 
-    uint32_t *pid = (uint32_t*)id.data();
-    for (size_t i = 0; i < id.size(); ++i)
-        pid[i] = __builtin_bswap32(pid[i]);
+    uint32_t *pcid = (uint32_t*)cid.data();
+    for (size_t i = 0; i < cid.size(); ++i)
+        pcid[i] = __builtin_bswap32(pcid[i]);
 
     // write the file in vtk format
     const char *fn = fmt_fname(comm, dir, "bodies");
@@ -131,7 +138,7 @@ void write_vtk(MPI_Comm comm, const patch_data &pd, const patch_force &pf, const
 
     fprintf(fh, "VERTICES %ld %ld\n", n, 2*n);
 
-    fwrite(id.data(), sizeof(int), id.size(), fh);
+    fwrite(cid.data(), sizeof(int), cid.size(), fh);
 
     fprintf(fh, "POINT_DATA %ld\n"
                 "SCALARS owner int 1\n"
@@ -158,6 +165,11 @@ void write_vtk(MPI_Comm comm, const patch_data &pd, const patch_force &pf, const
                 "LOOKUP_TABLE default\n");
 
     fwrite(vw.data(), sizeof(double), vw.size(), fh);
+
+    fprintf(fh, "SCALARS id int 1\n"
+                "LOOKUP_TABLE default\n");
+
+    fwrite(id.data(), sizeof(int), id.size(), fh);
 
     fprintf(fh, "SCALARS fu double 1\n"
                 "LOOKUP_TABLE default\n");

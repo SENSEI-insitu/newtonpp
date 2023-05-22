@@ -118,18 +118,18 @@ void isend(MPI_Comm comm, const patch_data &pd,
     if (n)
     {
 #if defined(NEWTONPP_GPU_DIRECT)
-        auto [pd_m, pd_x, pd_y, pd_z, pd_u, pd_v, pd_w] = pd.get_data();
+        auto [pd_m, pd_x, pd_y, pd_z, pd_u, pd_v, pd_w, pd_id] = pd.get_data();
         auto [pf_u, pf_v, pf_w] = pf.get_data();
 #else
         auto [spd_m, pd_m, spd_x, pd_x, spd_y, pd_y, spd_z, pd_z,
-              spd_u, pd_u, spd_v, pd_v, spd_w, pd_w] = pd.get_cpu_accessible();
+              spd_u, pd_u, spd_v, pd_v, spd_w, pd_w, spd_id, pd_id] = pd.get_cpu_accessible();
 
         auto [spf_u, pf_u, spf_v, pf_v, spf_w, pf_w] = pf.get_cpu_accessible();
 
         reqs.m_data = {spd_m, spd_x, spd_y, spd_z, spd_u, spd_v, spd_w, spf_u, spf_v, spf_w};
+        reqs.m_idata = spd_id;
 #endif
-
-        reqs.m_size = 10;
+        reqs.m_size = 11;
         MPI_Request *req = reqs.m_req;
 
         MPI_Isend(pd_m, n, MPI_DOUBLE, dest, ++tag, comm,   req);
@@ -139,6 +139,7 @@ void isend(MPI_Comm comm, const patch_data &pd,
         MPI_Isend(pd_u, n, MPI_DOUBLE, dest, ++tag, comm, ++req);
         MPI_Isend(pd_v, n, MPI_DOUBLE, dest, ++tag, comm, ++req);
         MPI_Isend(pd_w, n, MPI_DOUBLE, dest, ++tag, comm, ++req);
+        MPI_Isend(pd_id,n, MPI_INT,    dest, ++tag, comm, ++req);
         MPI_Isend(pf_u, n, MPI_DOUBLE, dest, ++tag, comm, ++req);
         MPI_Isend(pf_v, n, MPI_DOUBLE, dest, ++tag, comm, ++req);
         MPI_Isend(pf_w, n, MPI_DOUBLE, dest, ++tag, comm, ++req);
@@ -168,6 +169,7 @@ void recv(MPI_Comm comm, patch_data &pd, patch_force &pf, int src, int tag)
         hamr::buffer<double> tpd_u(alloc, n);
         hamr::buffer<double> tpd_v(alloc, n);
         hamr::buffer<double> tpd_w(alloc, n);
+        hamr::buffer<int>   tpd_id(alloc, n);
         hamr::buffer<double> tpf_u(alloc, n);
         hamr::buffer<double> tpf_v(alloc, n);
         hamr::buffer<double> tpf_w(alloc, n);
@@ -179,6 +181,7 @@ void recv(MPI_Comm comm, patch_data &pd, patch_force &pf, int src, int tag)
         MPI_Recv(tpd_u.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
         MPI_Recv(tpd_v.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
         MPI_Recv(tpd_w.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(tpd_id.data(),n, MPI_INT,    src, ++tag, comm, MPI_STATUS_IGNORE);
         MPI_Recv(tpf_u.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
         MPI_Recv(tpf_v.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
         MPI_Recv(tpf_w.data(), n, MPI_DOUBLE, src, ++tag, comm, MPI_STATUS_IGNORE);
@@ -190,6 +193,7 @@ void recv(MPI_Comm comm, patch_data &pd, patch_force &pf, int src, int tag)
         pd.m_u = std::move(tpd_u);
         pd.m_v = std::move(tpd_v);
         pd.m_w = std::move(tpd_w);
+        pd.m_id = std::move(tpd_id);
         pf.m_u = std::move(tpf_u);
         pf.m_v = std::move(tpf_v);
         pf.m_w = std::move(tpf_w);

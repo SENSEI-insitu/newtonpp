@@ -292,26 +292,22 @@ void package(const patch_data &pdi, const patch_force &pfi,
 #if defined(NEWTONPP_ENABLE_CUDA)
     int threads_per_block = 128;
     cuda::stream_compact(
-        pdo.m_m.data(),
-        pdo.m_x.data(), pdo.m_y.data(), pdo.m_z.data(),
-        pdo.m_u.data(), pdo.m_v.data(), pdo.m_w.data(),
+        pdo.m_m.data(), pdo.m_x.data(), pdo.m_y.data(), pdo.m_z.data(),
+        pdo.m_u.data(), pdo.m_v.data(), pdo.m_w.data(), pdo.m_id.data(),
         pfo.m_u.data(), pfo.m_v.data(), pfo.m_w.data(),
         no,
-        pdi.m_m.data(),
-        pdi.m_x.data(), pdi.m_y.data(), pdi.m_z.data(),
-        pdi.m_u.data(), pdi.m_v.data(), pdi.m_w.data(),
+        pdi.m_m.data(), pdi.m_x.data(), pdi.m_y.data(), pdi.m_z.data(),
+        pdi.m_u.data(), pdi.m_v.data(), pdi.m_w.data(), pdi.m_id.data(),
         pfi.m_u.data(), pfi.m_v.data(), pfi.m_w.data(),
         pmask, ni, threads_per_block);
 #else
     cpu::stream_compact(
-        pdo.m_m.data(),
-        pdo.m_x.data(), pdo.m_y.data(), pdo.m_z.data(),
-        pdo.m_u.data(), pdo.m_v.data(), pdo.m_w.data(),
+        pdo.m_m.data(), pdo.m_x.data(), pdo.m_y.data(), pdo.m_z.data(),
+        pdo.m_u.data(), pdo.m_v.data(), pdo.m_w.data(), pdo.m_id.data(),
         pfo.m_u.data(), pfo.m_v.data(), pfo.m_w.data(),
         no,
-        pdi.m_m.data(),
-        pdi.m_x.data(), pdi.m_y.data(), pdi.m_z.data(),
-        pdi.m_u.data(), pdi.m_v.data(), pdi.m_w.data(),
+        pdi.m_m.data(), pdi.m_x.data(), pdi.m_y.data(), pdi.m_z.data(),
+        pdi.m_u.data(), pdi.m_v.data(), pdi.m_w.data(), pdi.m_id.data(),
         pfi.m_u.data(), pfi.m_v.data(), pfi.m_w.data(),
         pmask, ni);
 #endif

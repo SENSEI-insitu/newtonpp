@@ -280,10 +280,11 @@ template<class T, bool bZeroPad>
 __global__ void
 streamCompact_kernel(
     T *pdo_m, T *pdo_x, T *pdo_y, T *pdo_z,
-    T *pdo_u, T *pdo_v, T *pdo_w, T *pfo_u, T *pfo_v, T *pfo_w,
+    T *pdo_u, T *pdo_v, T *pdo_w, int *pdo_id,
+    T *pfo_u, T *pfo_v, T *pfo_w,
     int *outCount, const int *gBaseSums,
     const T *pdi_m, const T *pdi_x, const T *pdi_y, const T *pdi_z,
-    const T *pdi_u, const T *pdi_v, const T *pdi_w,
+    const T *pdi_u, const T *pdi_v, const T *pdi_w, const int *pdi_id,
     const T *pfi_u, const T *pfi_v, const T *pfi_w,
     const int *mask,
     size_t N, size_t elementsPerPartial )
@@ -335,6 +336,7 @@ streamCompact_kernel(
             pdo_u[outIndex] = pdi_u[index];
             pdo_v[outIndex] = pdi_v[index];
             pdo_w[outIndex] = pdi_w[index];
+            pdo_id[outIndex] = pdi_id[index];
             pfo_u[outIndex] = pfi_u[index];
             pfo_v[outIndex] = pfi_v[index];
             pfo_w[outIndex] = pfi_w[index];
@@ -392,11 +394,11 @@ __device__ int g_globalPartials[MAX_PARTIALS];
 template<class T, bool bZeroPad>
 int streamCompact(
     T *pdo_m, T *pdo_x, T *pdo_y, T *pdo_z,
-    T *pdo_u, T *pdo_v, T *pdo_w,
+    T *pdo_u, T *pdo_v, T *pdo_w, int *pdo_id,
     T *pfo_u, T *pfo_v, T *pfo_w,
     int &nOut,
     const T *pdi_m, const T *pdi_x, const T *pdi_y, const T *pdi_z,
-    const T *pdi_u, const T *pdi_v, const T *pdi_w,
+    const T *pdi_u, const T *pdi_v, const T *pdi_w, const int *pdi_id,
     const T *pfi_u, const T *pfi_v, const T *pfi_w,
     const int *mask, size_t N, int b )
 {
@@ -419,11 +421,11 @@ int streamCompact(
         // compact on one block with b threads
         streamCompact_kernel<T, bZeroPad><<<1,b,sBytes>>>(
             pdo_m, pdo_x, pdo_y, pdo_z,
-            pdo_u, pdo_v, pdo_w,
+            pdo_u, pdo_v, pdo_w, pdo_id,
             pfo_u, pfo_v, pfo_w,
             outCount, 0,
             pdi_m, pdi_x, pdi_y, pdi_z,
-            pdi_u, pdi_v, pdi_w,
+            pdi_u, pdi_v, pdi_w, pdi_id,
             pfi_u, pfi_v, pfi_w,
             mask, N, N );
 
@@ -476,11 +478,11 @@ int streamCompact(
     // copy the flagged data
     streamCompact_kernel<T, bZeroPad><<<numBlocks,b,sBytes>>>(
         pdo_m, pdo_x, pdo_y, pdo_z,
-        pdo_u, pdo_v, pdo_w,
+        pdo_u, pdo_v, pdo_w, pdo_id,
         pfo_u, pfo_v, pfo_w,
         outCount, gPartials,
         pdi_m, pdi_x, pdi_y, pdi_z,
-        pdi_u, pdi_v, pdi_w,
+        pdi_u, pdi_v, pdi_w, pdi_id,
         pfi_u, pfi_v, pfi_w,
         mask, N, elementsPerPartial );
 
@@ -499,24 +501,22 @@ int streamCompact(
 
 // **************************************************************************
 int stream_compact(
-    double *pdo_m,
-    double *pdo_x, double *pdo_y, double *pdo_z,
-    double *pdo_u, double *pdo_v, double *pdo_w,
+    double *pdo_m, double *pdo_x, double *pdo_y, double *pdo_z,
+    double *pdo_u, double *pdo_v, double *pdo_w, int *pdo_id,
     double *pfo_u, double *pfo_v, double *pfo_w,
     int &outCount,
-    const double *pdi_m,
-    const double *pdi_x, const double *pdi_y, const double *pdi_z,
-    const double *pdi_u, const double *pdi_v, const double *pdi_w,
+    const double *pdi_m, const double *pdi_x, const double *pdi_y, const double *pdi_z,
+    const double *pdi_u, const double *pdi_v, const double *pdi_w, const int *pdi_id,
     const double *pfi_u, const double *pfi_v, const double *pfi_w,
     const int *mask, size_t N, int b )
 {
     return streamCompact<double,true>(
         pdo_m, pdo_x, pdo_y, pdo_z,
-        pdo_u, pdo_v, pdo_w,
+        pdo_u, pdo_v, pdo_w, pdo_id,
         pfo_u, pfo_v, pfo_w,
         outCount,
         pdi_m, pdi_x, pdi_y, pdi_z,
-        pdi_u, pdi_v, pdi_w,
+        pdi_u, pdi_v, pdi_w, pdi_id,
         pfi_u, pfi_v, pfi_w,
         mask, N, b);
 }

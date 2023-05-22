@@ -17,8 +17,9 @@ struct requests
     void operator=(const requests &) = delete;
 
     int m_size;                                        ///< number of requests actually made
-    MPI_Request m_req[11];                             ///< the requests (11 needed to send all fields and size)
+    MPI_Request m_req[12];                             ///< the requests (12 needed to send all fields and size)
     std::vector<std::shared_ptr<const double>> m_data; ///< keeps buffers alive durring communication
+    std::shared_ptr<const int> m_idata;                ///< keeps buffers alive durring communication
 };
 
 /// send/receive patch data's mass and position

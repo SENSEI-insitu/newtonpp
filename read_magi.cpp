@@ -43,7 +43,8 @@ int check_hid(int rank, const char *desc, hid_t handle)
  * in doc/unit.txt find G for these computational units.
  */
 // --------------------------------------------------------------------------
-int read_magi(MPI_Comm comm, const char *file, patch &dom, patch_data &pd)
+int read_magi(MPI_Comm comm,
+    const char *h5_file, const char *sum_file, patch &dom, patch_data &pd)
 {
     int rank = 0;
     int n_ranks = 1;
@@ -51,8 +52,8 @@ int read_magi(MPI_Comm comm, const char *file, patch &dom, patch_data &pd)
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &n_ranks);
 
-    // open the file
-    hid_t fh = H5Fopen(file, H5F_ACC_RDONLY, H5P_DEFAULT);
+    // open the h5_file
+    hid_t fh = H5Fopen(h5_file, H5F_ACC_RDONLY, H5P_DEFAULT);
     if (check_hid(rank, "open file", fh))
         return -1;
 
@@ -271,6 +272,90 @@ int read_magi(MPI_Comm comm, const char *file, patch &dom, patch_data &pd)
     pd.m_u = std::move(tmp_u);
     pd.m_v = std::move(tmp_v);
     pd.m_w = std::move(tmp_w);
+
+    // get the particle types
+    hamr::buffer<long> tmp_id(cpu_alloc(), nb_local, 0l);
+
+    if (sum_file)
+    {
+        long ncomp = 0;
+        std::vector<long> comps;
+
+        if (rank == 0)
+        {
+            // read the file, get the number of bodies per component
+            FILE *sfh = fopen(sum_file, "r");
+            if (!sfh)
+            {
+                std::cerr << "Error: failed to open \"" << sum_file << "\"" << std::endl;
+                return -1;
+            }
+
+            long skip1, skip2, compi;
+            if (fscanf(sfh, "%ld %ld %ld", &skip1, &ncomp, &skip2) != 3)
+            {
+                std::cerr << "Error: failed to read number of components" << std::endl;
+                return -1;
+            }
+
+            if (ncomp < 1)
+            {
+                std::cerr << "Error: expected at least one component" << std::endl;
+                return -1;
+            }
+
+            for (long i = 0; i < ncomp; ++i)
+            {
+                if (fscanf(sfh,  "%ld", &compi) != 1)
+                {
+                    std::cerr << "Error: failed to read component " << i << std::endl;
+                    return -1;
+                }
+
+                comps.push_back(compi);
+            }
+
+            fclose(sfh);
+
+            // send the list of components to the other ranks
+            MPI_Bcast(&ncomp, 1, MPI_LONG, 0, comm);
+            MPI_Bcast(comps.data(), ncomp, MPI_LONG, 0, comm);
+        }
+        else
+        {
+            // receive the list of components from rank 0
+            MPI_Bcast(&ncomp, 1, MPI_LONG, 0, comm);
+            comps.resize(ncomp);
+            MPI_Bcast(comps.data(), ncomp, MPI_LONG, 0, comm);
+        }
+
+        if (ncomp > 1)
+        {
+            // generate per star component ids
+            long *ptmp_id = tmp_id.data();
+
+            long gid_0 = bsz * rank + (rank < nlg ? rank : nlg);
+            long gid_1 = gid_0 + nb_local - 1;
+
+            long comp = 0;
+            for (long j = 0; j < ncomp; ++j)
+            {
+                long comp_start = comp;
+                comp += comps[j];
+                long comp_end = comp - 1;
+
+                long q0 = std::max(comp_start, gid_0) - gid_0;
+                long q1 = std::min(comp_end, gid_1) - gid_0;
+
+                if (q1 < q0) continue;
+
+                for (long q = q0; q <= q1; ++q)
+                    ptmp_id[q] = j;
+            }
+        }
+    }
+
+    pd.m_id = std::move(tmp_id);
 
     return 0;
 }

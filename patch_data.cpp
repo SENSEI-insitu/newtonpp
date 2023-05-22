@@ -3,7 +3,8 @@
 
 // --------------------------------------------------------------------------
 patch_data::patch_data(hamr::buffer_allocator alloc) : m_m(alloc),
-    m_x(alloc), m_y(alloc), m_z(alloc), m_u(alloc), m_v(alloc), m_w(alloc)
+    m_x(alloc), m_y(alloc), m_z(alloc), m_u(alloc), m_v(alloc), m_w(alloc),
+    m_id(alloc)
 {
     #ifdef DEBUG
     std::cerr << "patch_data::patch_data " << this << std::endl;
@@ -32,6 +33,7 @@ void patch_data::operator=(const patch_data &pd)
     m_u.assign(pd.m_u);
     m_v.assign(pd.m_v);
     m_w.assign(pd.m_w);
+    m_id.assign(pd.m_id);
 }
 
 // --------------------------------------------------------------------------
@@ -48,6 +50,7 @@ void patch_data::operator=(patch_data &&pd)
     m_u = std::move(pd.m_u);
     m_v = std::move(pd.m_v);
     m_w = std::move(pd.m_w);
+    m_id = std::move(pd.m_id);
 }
 
 // --------------------------------------------------------------------------
@@ -64,6 +67,7 @@ void patch_data::resize(long n)
     m_u.resize(n);
     m_v.resize(n);
     m_w.resize(n);
+    m_id.resize(n);
 }
 
 // --------------------------------------------------------------------------
@@ -80,6 +84,7 @@ void patch_data::append(const patch_data &o)
     m_u.append(o.m_u);
     m_v.append(o.m_v);
     m_w.append(o.m_w);
+    m_id.append(o.m_id);
 }
 
 // --------------------------------------------------------------------------

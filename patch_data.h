@@ -34,12 +34,22 @@ struct patch_data
     auto get_mp_data() const { return  hamr::data(m_m, m_x, m_y, m_z); }
 
     /// read only access to data
-    auto get_cpu_accessible() const { return hamr::get_cpu_accessible(m_m, m_x, m_y, m_z, m_u, m_v, m_w); }
-    auto get_openmp_accessible() const { return hamr::get_openmp_accessible(m_m, m_x, m_y, m_z, m_u, m_v, m_w); }
+    auto get_cpu_accessible() const {
+        return std::tuple_cat(hamr::get_cpu_accessible(m_m, m_x, m_y, m_z, m_u, m_v, m_w),
+             hamr::get_cpu_accessible(m_id)); }
+
+    auto get_openmp_accessible() const {
+        return std::tuple_cat(hamr::get_openmp_accessible(m_m, m_x, m_y, m_z, m_u, m_v, m_w),
+            hamr::get_openmp_accessible(m_id)); }
 
     /// write access to data
-    auto get_data() { return  hamr::data(m_m, m_x, m_y, m_z, m_u, m_v, m_w); }
-    auto get_data() const { return  hamr::data(m_m, m_x, m_y, m_z, m_u, m_v, m_w); }
+    auto get_data() {
+        return std::tuple_cat(hamr::data(m_m, m_x, m_y, m_z, m_u, m_v, m_w),
+            hamr::data(m_id)); }
+
+    auto get_data() const {
+        return std::tuple_cat(hamr::data(m_m, m_x, m_y, m_z, m_u, m_v, m_w),
+            hamr::data(m_id)); }
 
     hamr::buffer<double> m_m; ///< body mass
     hamr::buffer<double> m_x; ///< body position x
@@ -48,6 +58,7 @@ struct patch_data
     hamr::buffer<double> m_u; ///< body velocity x
     hamr::buffer<double> m_v; ///< body velocity y
     hamr::buffer<double> m_w; ///< body velocity y
+    hamr::buffer<int> m_id;   ///< body type or id
 };
 
 /// reduce the input to a single body located at its center of mass

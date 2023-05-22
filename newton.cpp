@@ -66,14 +66,15 @@ int main(int argc, char **argv)
     double G = 6.67408e-11;         // the gravitational constant
     long n_its = 0;                 // number of solver steps
     long n_bodies = 0;              // number of bodies
-    const char *magi_file = nullptr;// where initial conditions can be found
+    const char *magi_h5 = nullptr;  // where initial positions/velocities can be found
+    const char *magi_sum = nullptr; // where particle types can be found
     const char *out_dir = nullptr;  // directory to write results at
     long io_int = 0;                // how often to write resutls
     const char *is_conf = nullptr;  // sensei in situ configuration file
     long is_int = 0;                // how often to invoke in situ processing
 
-    if (parse_command_line(argc, argv, comm, G, h, eps, nfr,
-        n_its, n_bodies, magi_file, out_dir, io_int, is_conf, is_int))
+    if (parse_command_line(argc, argv, comm, G, h, eps, nfr, n_its,
+        n_bodies, magi_h5, magi_sum, out_dir, io_int, is_conf, is_int))
         return -1;
 
     // load the initial condition and initialize the bodies
@@ -82,11 +83,11 @@ int main(int argc, char **argv)
     std::vector<patch> patches;
 
 #if defined(NEWTONPP_ENABLE_MAGI)
-    if (magi_file)
+    if (magi_h5)
     {
-        // load the ic
+        // load the ic positions and velocities
         patch dom;
-        if (magi_file && read_magi(comm, magi_file, dom, pd))
+        if (magi_h5 && read_magi(comm, magi_h5, magi_sum, dom, pd))
             return -1;
 
         // decompose domain

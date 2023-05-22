@@ -19,14 +19,12 @@ namespace cuda
  * @returns zero if successful
  */
 int stream_compact(
-    double *pdo_m,
-    double *pdo_x, double *pdo_y, double *pdo_z,
-    double *pdo_u, double *pdo_v, double *pdo_w,
+    double *pdo_m, double *pdo_x, double *pdo_y, double *pdo_z,
+    double *pdo_u, double *pdo_v, double *pdo_w, int *pdo_id,
     double *pfo_u, double *pfo_v, double *pfo_w,
     int &outCount,
-    const double *pdi_m,
-    const double *pdi_x, const double *pdi_y, const double *pdi_z,
-    const double *pdi_u, const double *pdi_v, const double *pdi_w,
+    const double *pdi_m, const double *pdi_x, const double *pdi_y, const double *pdi_z,
+    const double *pdi_u, const double *pdi_v, const double *pdi_w, const int *pdi_id,
     const double *pfi_u, const double *pfi_v, const double *pfi_w,
     const int *mask, size_t N, int b );
 }
@@ -35,14 +33,12 @@ namespace cpu
 {
 
 int stream_compact(
-    double *pdo_m,
-    double *pdo_x, double *pdo_y, double *pdo_z,
-    double *pdo_u, double *pdo_v, double *pdo_w,
+    double *pdo_m, double *pdo_x, double *pdo_y, double *pdo_z,
+    double *pdo_u, double *pdo_v, double *pdo_w, int *pdo_id,
     double *pfo_u, double *pfo_v, double *pfo_w,
     int &outCount,
-    const double *pdi_m,
-    const double *pdi_x, const double *pdi_y, const double *pdi_z,
-    const double *pdi_u, const double *pdi_v, const double *pdi_w,
+    const double *pdi_m, const double *pdi_x, const double *pdi_y, const double *pdi_z,
+    const double *pdi_u, const double *pdi_v, const double *pdi_w, const int *pdi_id,
     const double *pfi_u, const double *pfi_v, const double *pfi_w,
     const int *mask, size_t N );
 }

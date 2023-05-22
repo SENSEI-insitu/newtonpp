@@ -7,9 +7,9 @@
 // --------------------------------------------------------------------------
 int parse_command_line(int argc, char **argv, MPI_Comm comm,
     double &G, double &dt, double &eps, double &theta,
-    long &n_its, long &n_bodies, const char *&magi_file,
-    const char *&out_dir, long &io_int, const char *&is_conf,
-    long &is_int)
+    long &n_its, long &n_bodies, const char *&magi_h5,
+    const char *&magi_sum, const char *&out_dir, long &io_int,
+    const char *&is_conf, long &is_int)
 {
     int rank = 0;
     MPI_Comm_rank(comm, &rank);
@@ -29,7 +29,8 @@ int parse_command_line(int argc, char **argv, MPI_Comm comm,
                     << "    --theta      : threshold for reduced representation" << std::endl
                     << "    --n_its      : how many iterations to perform" << std::endl
                     << "    --n_bodies   : the total number of bodies" << std::endl
-                    << "    --magi_file  : MAGI initialization files" << std::endl
+                    << "    --magi_h5    : MAGI file with particle positions" << std::endl
+                    << "    --magi_sum   : MAGI file with component sizes" << std::endl
                     << "    --out_dir    : where to write the results" << std::endl
                     << "    --out_int    : how often to write results" << std::endl
                     << "    --sensei_xml : a sensei configuration file" << std::endl
@@ -77,14 +78,25 @@ int parse_command_line(int argc, char **argv, MPI_Comm comm,
                 if (rank == 0)
                     std::cerr << "will generate " << n_bodies << " bodies total" << std::endl;
             }
-            else if(strcmp(argv[q], "--magi_file") == 0)
+            else if(strcmp(argv[q], "--magi_h5") == 0)
             {
-                magi_file = argv[++q];
+                magi_h5 = argv[++q];
                 if (rank == 0)
-#ifdef ENABLE_MAGI
-                    std::cerr << "initializing from " << magi_file << std::endl;
+#if defined(NEWTONPP_ENABLE_MAGI)
+                    std::cerr << "initializing postions from " << magi_h5 << std::endl;
 #else
-                    std::cerr << "hdf5 is required for magi initial conditions" << std::endl;
+                    std::cerr << "Error: hdf5 is required for magi initial conditions" << std::endl;
+                abort();
+#endif
+            }
+            else if(strcmp(argv[q], "--magi_sum") == 0)
+            {
+                magi_sum = argv[++q];
+                if (rank == 0)
+#if defined(NEWTONPP_ENABLE_MAGI)
+                    std::cerr << "initializing components from " << magi_sum << std::endl;
+#else
+                    std::cerr << "Error: magi components disabled" << std::endl;
                 abort();
 #endif
             }
