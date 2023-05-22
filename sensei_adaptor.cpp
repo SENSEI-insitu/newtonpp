@@ -539,10 +539,9 @@ int sensei_adaptor::AddArray(svtkDataObject* mesh,
                 auto buf = GetBuffer(arrayName, m_bodies, m_body_forces);
                 if (buf)
                 {
-                    auto pbuf = buf->pointer();
-                    auto alloc = m_bodies->m_x.get_allocator();
-                    int owner = m_bodies->m_x.get_owner();
-                    aout = svtkHAMRDoubleArray::New(arrayName, pbuf, nb, 1, alloc, owner);
+                    aout = svtkHAMRDoubleArray::New(arrayName, buf->pointer(), nb, 1,
+                             buf->get_allocator(), buf->get_stream(), buf->get_transfer_mode(),
+                             buf->get_owner());
                 }
             }
 
