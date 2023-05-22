@@ -39,6 +39,7 @@ GetBuffer(const std::string &anm, const patch_data *pd, const patch_force *pf)
                 case 'w':
                     return &pd->m_w;
             }
+            break;
         case 'f':
             switch (anm[1])
             {
@@ -49,6 +50,7 @@ GetBuffer(const std::string &anm, const patch_data *pd, const patch_force *pf)
                 case 'w':
                     return &pf->m_w;
             }
+            break;
     }
 
     std::cerr << "Error: no array named \"" << anm << "\"" << std::endl;
@@ -63,11 +65,11 @@ void GetMinMax(const hamr::buffer<double> &buf, long n_elem, double &mn, double 
 
     const double *pbuf = buf.data();
 
-#if defined(NEWTONPP_USE_OMP_LOOP)
+/*#if defined(NEWTONPP_USE_OMP_LOOP)
     #pragma omp target teams loop is_device_ptr(pbuf), reduction(min:mn), reduction(max:mx)
-#else
+#else*/
     #pragma omp target teams distribute parallel for is_device_ptr(pbuf), reduction(min:mn), reduction(max:mx)
-#endif
+//#endif
     for (long i = 0; i < n_elem; ++i)
     {
         mn = pbuf[i] > mn ? mn : pbuf[i];
