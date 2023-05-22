@@ -134,7 +134,7 @@ void write_vtk(MPI_Comm comm, const patch_data &pd, const patch_force &pf, const
     fwrite(id.data(), sizeof(int), id.size(), fh);
 
     fprintf(fh, "POINT_DATA %ld\n"
-                "SCALARS rank int 1\n"
+                "SCALARS owner int 1\n"
                 "LOOKUP_TABLE default\n", n);
 
     fwrite(r.data(), sizeof(int), r.size(), fh);
@@ -299,7 +299,7 @@ void write_vtk(MPI_Comm comm, const std::vector<patch> &patches, const char *dir
     fwrite(ct.data(), sizeof(int), ct.size(), fh);
 
     fprintf(fh, "CELL_DATA %ld\n"
-                "SCALARS rank int 1\n"
+                "SCALARS owner int 1\n"
                 "LOOKUP_TABLE default\n", n);
 
     fwrite(r.data(), sizeof(int), r.size(), fh);

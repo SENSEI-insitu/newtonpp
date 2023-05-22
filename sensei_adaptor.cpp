@@ -169,8 +169,8 @@ int sensei_adaptor::GetMeshMetadata(unsigned int id, sensei::MeshMetadataPtr &md
     else
     {
         md->NumArrays = 11;
-        md->ArrayName = {"rank", "m", "x", "y", "z",
                          "vu", "vv", "vw", "fu", "fv", "fw"};
+        md->ArrayName = {"owner", "m", "x", "y", "z",
 
         md->ArrayCentering = {pCen, pCen, pCen, pCen, pCen,
                               pCen, pCen, pCen, pCen, pCen, pCen};
