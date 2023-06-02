@@ -89,3 +89,12 @@ mpiexec -np 4 ./newtonpp_clang15_omp --n_its 1000 --out_dir ruic_out --out_int 1
 mpiexec -np 4 ./newtonpp_clang15_omp --magi_file /work/SENSEI/magi/bin/dat/s15.tmp0.h5 --G 4.498466e+00 --dt 0.00001 --n_its 100000000 --out_dir s15_4_gpu --out_int 1000 --eps 0.0
 ```
 
+
+## SENSEI in-situ
+Currently one needs to use the sensei_data_array branch. See [PR #101](https://github.com/SENSEI-insitu/SENSEI/pull/101).<br>
+To make use of GPU's SENSEI needs to configure HAMR for OpenMP `-DHAMR_ENABLE_OPENMP -DHAMR_OPENMP_ARCH=sm_75` (cc75 if using nvc++). <br>
+One can optional use both CUDA and OpenMP in SENSEI with the NVIDIA HPC compiler. <br>
+Test with the sensei::Histogram and sensei::ParticleDensity analysis back ends. Others should work as well, but those could use CPU or GPU via CUDA. <br>
+
+
+
