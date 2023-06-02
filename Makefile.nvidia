@@ -99,10 +99,3 @@ newtonpp_nv_omp:  stream_compact.a $(newtonpp_objs) newton.cpp
 	$(SENSEI_LINK) $(HAMR_LINK) $(CLINK) $(MPI_LINK) $(HDF5_LINK) $(OMP_LINK) \
 	-o newtonpp_nv_omp
 
-
-
-galaxy_ic: galaxy_ic.cpp
-	g++  $(C_OPT_FLAGS)  galaxy_ic.cpp -o galaxy_ic
-
-plot_ic: plot_ic.cpp
-	g++ $(C_OPT_FLAGS)  plot_ic.cpp -o plot_ic

@@ -1,17 +1,4 @@
 
-# CPU only for debug
-#####################
-# HAMR=/work/SENSEI/HAMR-cpu/
-# MPI_FLAGS=-I/usr/include/mpich-x86_64 -L/usr/lib64/mpich/lib -Wl,-rpath -Wl,/usr/lib64/mpich/lib -Wl,--enable-new-dtags -lmpi
-# OMP_FLAGS=
-# CFLAGS=-lm -lstdc++ -Wall -Wextra -fPIE -std=c++17 -fsanitize=address
-# C_OPT_FLAGS=-O0 -g -march=native -mtune=native
-# CUDA_OPT_FLAGS=-O0 -g -G
-# CUDA_XOPT_FLAGS=-O0,-g,-march=native,-mtune=native
-# CUDA=/usr/local/cuda-12.0/lib64/
-# CC=gcc
-# CXX=g++
-
 USE_SENSEI=
 
 
@@ -89,9 +76,3 @@ newtonpp_gcc_omp:  stream_compact.a $(newtonpp_objs) newton.cpp
 	stream_compact.a ${CUDA}/libcudart_static.a \
 	$(SENSEI_LINK) $(HAMR_LINK) $(CLINK) $(MPI_LINK) $(OMP_LINK) \
 	-o newtonpp_gcc_omp
-
-galaxy_ic: galaxy_ic.cpp
-	g++  $(C_OPT_FLAGS)  galaxy_ic.cpp -o galaxy_ic
-
-plot_ic: plot_ic.cpp
-	g++ $(C_OPT_FLAGS)  plot_ic.cpp -o plot_ic

@@ -79,8 +79,4 @@ newtonpp_clang_omp:  stream_compact.a $(newtonpp_objs) newton.cpp
 	$(CLINK) $(MPI_LINK) $(OMP_LINK) $(SENSEI_LINK) $(HAMR_LINK) \
 	stream_compact.a ${CUDA}/libcudart_static.a
 
-galaxy_ic: galaxy_ic.cpp
-	g++  $(C_OPT_FLAGS)  galaxy_ic.cpp -o galaxy_ic
 
-plot_ic: plot_ic.cpp
-	g++ $(C_OPT_FLAGS)  plot_ic.cpp -o plot_ic

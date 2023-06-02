@@ -41,9 +41,6 @@ endif
 .PHONY: all
 all : stream_compact.a newtonpp_gcc_debug
 
-.PHONY: ics
-ics: galaxy_ic plot_ic
-
 .PHONY: clean
 clean:
 	rm -f *.o stream_compact.a newtonpp_gcc_debug
