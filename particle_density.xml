@@ -1,0 +1,5 @@
+<sensei>
+  <analysis type="ParticleDensity" mesh="bodies"
+     xpos="x" ypos="y" zpos="z" mass="m" proj="xy"
+     odir="./" xres="128" yres="128" enabled="1" />
+</sensei>
