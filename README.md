@@ -2,7 +2,7 @@
 
 An MPI + OpenMP offload parallel n-body code written in C++.
 The code currently implements a direct method but we are working on a tree based method.
-Platofmr portable data struictures and memory management is handled by [HAMR](https://github.com/LBL-EESA/HAMR).
+Platform portable data structures and memory management is handled by [HAMR](https://github.com/LBL-EESA/HAMR).
 The code can write its state to disk in [VTK](https://www.vtk.org) format for visualization and is instrumented with [SENSEI](https://github.com/SENSEI-insitu/SENSEI) for in situ visualziation.
 The unit system is very flexible and can be specified on the command line.
 The code can ingest initial conditions in the HDF5 format defined by [MAGI](https://academic.oup.com/mnras/article/475/2/2269/4791573).
