@@ -14,7 +14,7 @@ int init_insitu(MPI_Comm comm, const char *is_conf, insitu_data &is_data)
     if (is_data.m_analysis->Initialize(is_conf))
     {
         if (rank == 0)
-            std::cerr << "Failed to initialize the in-situ backend" << std::endl;
+            std::cerr << "Error: failed to initialize the in-situ backend" << std::endl;
 
         is_data.m_analysis->Delete();
         is_data.m_analysis = nullptr;
@@ -25,7 +25,7 @@ int init_insitu(MPI_Comm comm, const char *is_conf, insitu_data &is_data)
     is_data.m_data = sensei_adaptor::New();
 
     if (rank == 0)
-        std::cerr << "Initialized the in-situ backend" << std::endl;
+        std::cerr << " === newton++ === : initialized the in-situ backend" << std::endl;
 
     return 0;
 }
@@ -44,13 +44,8 @@ int update_insitu(MPI_Comm comm, insitu_data &is_data,
     if (!is_data.m_analysis->Execute(is_data.m_data, nullptr))
         ierr = -1;
 
-    if (rank == 0)
-    {
-        if (ierr)
-            std::cerr << "Failed to update the in-situ backend" << std::endl;
-        else
-            std::cerr << "Updated the in-situ backend" << std::endl;
-    }
+    if ((rank == 0) && ierr)
+        std::cerr << "Failed to update the in-situ backend" << std::endl;
 
     return ierr;
 }
@@ -66,13 +61,8 @@ int finalize_insitu(MPI_Comm comm, insitu_data &is_data)
     if (is_data.m_analysis->Finalize())
         ierr = -1;
 
-    if (rank == 0)
-    {
-        if (ierr)
-            std::cerr << "Failed to finalize the in-situ backend" << std::endl;
-        else
-            std::cerr << "Finalized the in-situ backend" << std::endl;
-    }
+    if ((rank == 0) && ierr)
+        std::cerr << "Failed to finalize the in-situ backend" << std::endl;
 
     is_data.m_analysis->Delete();
     is_data.m_data->Delete();

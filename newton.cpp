@@ -10,6 +10,7 @@
 #include "solver.h"
 #include "write_vtk.h"
 #include "command_line.h"
+#include "timer_stack.h"
 #if defined(NEWTONPP_ENABLE_SENSEI)
 #include "insitu.h"
 #endif
@@ -49,16 +50,23 @@ using timer = std::chrono::high_resolution_clock;
 
 int main(int argc, char **argv)
 {
-    auto start_time = timer::now();
-
     int rank = 0;
     int n_ranks = 1;
     MPI_Comm comm = MPI_COMM_WORLD;
 
-    MPI_Init(&argc, &argv);
+    int thread_level = 0;
+    if ((MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_level) != MPI_SUCCESS) ||
+        (thread_level != MPI_THREAD_MULTIPLE))
+    {
+        std::cerr << "Error: failed to initialize MPI" << std::endl;
+        return -1;
+    }
 
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &n_ranks);
+
+    timer_stack timer(rank == 0);
+    timer.push();
 
     double h = 1e5;                 // time step size
     double nfr = 0.;                // distance for reduced representation
@@ -110,80 +118,104 @@ int main(int argc, char **argv)
         if (initialize_random(comm, n_bodies, patches, pd, h, eps, nfr))
             return -1;
     }
+    timer.pop_push("read ic");
 
 #if defined(NEWTONPP_ENABLE_SENSEI)
     // initialize for in-situ
     insitu_data is_data;
-    if (is_conf && is_int && init_insitu(comm, is_conf, is_data))
-        return -1;
+    if (is_conf && is_int)
+    {
+        if (init_insitu(comm, is_conf, is_data))
+            return -1;
+        timer.pop_push("sensei init");
+    }
 #endif
 
     // write the domain decomp
     if (io_int)
+    {
         write_vtk(comm, patches, out_dir);
+        timer.pop_push("write dom");
+    }
 
     // flag nearby patches
     std::vector<int> nf;
     near(patches, nfr, nf);
+    timer.pop_push("build tree");
 
     // initialize forces
     forces(comm, pd, pf, G, eps, nf);
+    timer.pop_push("init forces");
 
     // write initial state
     if (io_int)
+    {
         write_vtk(comm, pd, pf, out_dir);
+        timer.pop_push("write part");
+    }
 
 #if defined(NEWTONPP_ENABLE_SENSEI)
     // process initial state
-    if (is_int && is_data && update_insitu(comm, is_data, 0, 0, patches, pd, pf))
-        return -1;
+    if (is_int && is_data)
+    {
+        if (update_insitu(comm, is_data, 0, 0, patches, pd, pf))
+            return -1;
+        timer.pop_push("sensei upd");
+    }
 #endif
-
-    if (rank == 0)
-        std::cerr << " === init " << (timer::now() - start_time) / 1ms << "ms" << std::endl;
 
     // iterate
     long it = 0;
     while (it < n_its)
     {
-        auto it_time  = timer::now();
-
         // update bodies
+        timer.push();
+        timer.push();
         velocity_verlet(comm, pd, pf, G, h, eps, nf);
+        timer.pop("integrate part");
 
         // update partition
         //if (n_ranks > 1)
         {
+            timer.push();
             hamr::buffer<int> dest(def_alloc());
             partition(comm, patches, pd, dest);
             move(comm, pd, pf, dest);
+            timer.pop("partition part");
         }
 
         // write current state
         if (io_int && (((it + 1) % io_int) == 0))
+        {
+            timer.push();
             write_vtk(comm, pd, pf, out_dir);
+            timer.pop("write part");
+        }
 
 #if defined(NEWTONPP_ENABLE_SENSEI)
         // process current state
-        if (is_int && is_data && update_insitu(comm, is_data, it, it*h, patches, pd, pf))
-            return -1;
+        if (is_int && is_data)
+        {
+            timer.push();
+            if (update_insitu(comm, is_data, it, it*h, patches, pd, pf))
+                return -1;
+            timer.pop("sensei upd");
+        }
 #endif
         it += 1;
-
-        if (rank == 0)
-            std::cerr << " === it " << it << " : " << (timer::now() - it_time) / 1ms << "ms" << std::endl;
+        timer.pop("iteration");
     }
+    timer.pop("main loop");
 
 #if defined(NEWTONPP_ENABLE_SENSEI)
     // finalize in-situ processing
+    timer.push();
     if (is_int && is_data && finalize_insitu(comm, is_data))
         return -1;
+    timer.pop("fin sensei");
 #endif
 
     MPI_Finalize();
-
-    if (rank == 0)
-        std::cerr << " === total " << (timer::now() - start_time) / 1s << "s" << std::endl;
 
     return 0;
 }
