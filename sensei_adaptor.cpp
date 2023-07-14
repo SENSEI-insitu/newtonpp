@@ -188,7 +188,7 @@ int sensei_adaptor::GetMeshMetadata(unsigned int id, sensei::MeshMetadataPtr &md
 
     if (md->Flags.BlockBoundsSet())
     {
-        auto [spx, px] = hamr::get_cpu_accessible(m_patches->at(rank).m_x);
+        auto [spx, px] = hamr::get_host_accessible(m_patches->at(rank).m_x);
         md->Bounds = {px[0], px[1], px[2], px[3], px[4]};
         md->BlockBounds = {{px[0], px[1], px[2], px[3], px[4]}};
     }
@@ -328,7 +328,7 @@ int sensei_adaptor::GetMesh(const std::string &meshName,
 
         const patch &pi = m_patches->at(rank);
 
-        auto [spi_x, pi_x] = hamr::get_cpu_accessible(pi.m_x);
+        auto [spi_x, pi_x] = hamr::get_host_accessible(pi.m_x);
 
         ppts[0 ] = pi_x[0];
         ppts[1 ] = pi_x[2];
@@ -410,9 +410,9 @@ int sensei_adaptor::GetMesh(const std::string &meshName,
 
         long nb = m_bodies->size();
 
-        auto [spd_x, pd_x] = hamr::get_cpu_accessible(m_bodies->m_x);
-        auto [spd_y, pd_y] = hamr::get_cpu_accessible(m_bodies->m_y);
-        auto [spd_z, pd_z] = hamr::get_cpu_accessible(m_bodies->m_z);
+        auto [spd_x, pd_x] = hamr::get_host_accessible(m_bodies->m_x);
+        auto [spd_y, pd_y] = hamr::get_host_accessible(m_bodies->m_y);
+        auto [spd_z, pd_z] = hamr::get_host_accessible(m_bodies->m_z);
 
         // topology
         long ncon = nb;
@@ -597,7 +597,7 @@ int sensei_adaptor::AddArray(svtkDataObject* mesh,
                     auto buf = GetBuffer(arrayName, m_bodies, m_body_forces);
                     if (buf)
                     {
-                        auto [spbuf, pbuf] = hamr::get_cpu_accessible(*buf);
+                        auto [spbuf, pbuf] = hamr::get_host_accessible(*buf);
 
                         auto ao = svtkDoubleArray::New();
                         ao->SetName(arrayName);

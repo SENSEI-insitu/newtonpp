@@ -30,9 +30,9 @@ void write_vtk(MPI_Comm comm, const patch_data &pd, const patch_force &pf, const
     MPI_Comm_rank(comm, &rank);
 
     auto [spd_m, pd_m, spd_x, pd_x, spd_y, pd_y, spd_z, pd_z,
-          spd_u, pd_u, spd_v, pd_v, spd_w, pd_w, spd_id, pd_id] = pd.get_cpu_accessible();
+          spd_u, pd_u, spd_v, pd_v, spd_w, pd_w, spd_id, pd_id] = pd.get_host_accessible();
 
-    auto [spf_u, pf_u, spf_v, pf_v, spf_w, pf_w] = pf.get_cpu_accessible();
+    auto [spf_u, pf_u, spf_v, pf_v, spf_w, pf_w] = pf.get_host_accessible();
 
     // package in the vtk layout
     long n = pd.size();
@@ -209,7 +209,7 @@ void write_vtk(MPI_Comm comm, const std::vector<patch> &patches, const char *dir
     {
         const patch &pi = patches[i];
 
-        auto [spi_x, pi_x] = hamr::get_cpu_accessible(pi.m_x);
+        auto [spi_x, pi_x] = hamr::get_host_accessible(pi.m_x);
 
         long ii = 24*i;
         x[ii    ] = pi_x[0];

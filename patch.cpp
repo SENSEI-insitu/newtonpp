@@ -27,7 +27,7 @@ void patch::operator=(const patch &p)
 // --------------------------------------------------------------------------
 std::ostream &operator<<(std::ostream &os, const patch &p)
 {
-    auto spx = p.m_x.get_cpu_accessible();
+    auto spx = p.m_x.get_host_accessible();
     const double *px = spx.get();
 
     os << "{" << p.m_owner << " [" << px[0] << ", " << px[1] << ", "

@@ -26,7 +26,7 @@ struct patch_data
     void append(const patch_data &o);
 
     /// read only access to mass and position data
-    auto get_mp_cpu_accessible() const { return hamr::get_cpu_accessible(m_m, m_x, m_y, m_z); }
+    auto get_mp_host_accessible() const { return hamr::get_host_accessible(m_m, m_x, m_y, m_z); }
     auto get_mp_openmp_accessible() const { return hamr::get_openmp_accessible(m_m, m_x, m_y, m_z); }
 
     /// write access to mass and position data
@@ -34,9 +34,9 @@ struct patch_data
     auto get_mp_data() const { return  hamr::data(m_m, m_x, m_y, m_z); }
 
     /// read only access to data
-    auto get_cpu_accessible() const {
-        return std::tuple_cat(hamr::get_cpu_accessible(m_m, m_x, m_y, m_z, m_u, m_v, m_w),
-             hamr::get_cpu_accessible(m_id)); }
+    auto get_host_accessible() const {
+        return std::tuple_cat(hamr::get_host_accessible(m_m, m_x, m_y, m_z, m_u, m_v, m_w),
+             hamr::get_host_accessible(m_id)); }
 
     auto get_openmp_accessible() const {
         return std::tuple_cat(hamr::get_openmp_accessible(m_m, m_x, m_y, m_z, m_u, m_v, m_w),

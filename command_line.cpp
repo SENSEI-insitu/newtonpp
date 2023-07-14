@@ -46,44 +46,44 @@ int parse_command_line(int argc, char **argv, MPI_Comm comm,
             {
                 G = atof(argv[++q]);
                 if (rank == 0)
-                    std::cerr << "the gravitational constant is " << G << std::endl;
+                    std::cerr << " === newton++ === : the gravitational constant is " << G << std::endl;
             }
             else if (strcmp(argv[q], "--dt") == 0)
             {
                 dt = atof(argv[++q]);
                 if (rank == 0)
-                    std::cerr << "the time step is " << dt << std::endl;
+                    std::cerr << " === newton++ === : the time step is " << dt << std::endl;
             }
             else if (strcmp(argv[q], "--eps") == 0)
             {
                 eps = atof(argv[++q]);
                 if (rank == 0)
-                    std::cerr << "the softening length is " << eps << std::endl;
+                    std::cerr << " === newton++ === : the softening length is " << eps << std::endl;
             }
             else if (strcmp(argv[q], "--theta") == 0)
             {
                 theta = atof(argv[++q]);
                 if (rank == 0)
-                    std::cerr << "the reduced representaion threshold is " << theta << std::endl;
+                    std::cerr << " === newton++ === : the reduced representaion threshold is " << theta << std::endl;
             }
             else if (strcmp(argv[q], "--n_its") == 0)
             {
                 n_its = atol(argv[++q]);
                 if (rank == 0)
-                    std::cerr << "will run for " << n_its << " iterations" << std::endl;
+                    std::cerr << " === newton++ === : will run for " << n_its << " iterations" << std::endl;
             }
             else if(strcmp(argv[q], "--n_bodies") == 0)
             {
                 n_bodies = atol(argv[++q]);
                 if (rank == 0)
-                    std::cerr << "will generate " << n_bodies << " bodies total" << std::endl;
+                    std::cerr << " === newton++ === : will generate " << n_bodies << " bodies total" << std::endl;
             }
             else if(strcmp(argv[q], "--magi_h5") == 0)
             {
                 magi_h5 = argv[++q];
                 if (rank == 0)
 #if defined(NEWTONPP_ENABLE_MAGI)
-                    std::cerr << "initializing postions from " << magi_h5 << std::endl;
+                    std::cerr << "i === newton++ === : nitializing postions from " << magi_h5 << std::endl;
 #else
                     std::cerr << "Error: hdf5 is required for magi initial conditions" << std::endl;
                 abort();
@@ -94,7 +94,7 @@ int parse_command_line(int argc, char **argv, MPI_Comm comm,
                 magi_sum = argv[++q];
                 if (rank == 0)
 #if defined(NEWTONPP_ENABLE_MAGI)
-                    std::cerr << "initializing components from " << magi_sum << std::endl;
+                    std::cerr << " === newton++ === : initializing components from " << magi_sum << std::endl;
 #else
                     std::cerr << "Error: magi components disabled" << std::endl;
                 abort();
@@ -104,33 +104,32 @@ int parse_command_line(int argc, char **argv, MPI_Comm comm,
             {
                 out_dir = argv[++q];
                 if (rank == 0)
-                    std::cerr << "writing results at " << out_dir << std::endl;
+                    std::cerr << " === newton++ === : writing results at " << out_dir << std::endl;
             }
             else if(strcmp(argv[q], "--out_int") == 0)
             {
                 io_int = atol(argv[++q]);
                 if (rank == 0)
-                    std::cerr << "writing results every " << io_int
+                    std::cerr << " === newton++ === : writing results every " << io_int
                         << " iterations" << std::endl;
             }
             else if(strcmp(argv[q], "--sensei_xml") == 0)
             {
                 is_conf = argv[++q];
                 if (rank == 0)
-                    std::cerr << "in-situ initialized with " << is_conf << std::endl;
+                    std::cerr << " === newton++ === : in-situ initialized with " << is_conf << std::endl;
             }
             else if(strcmp(argv[q], "--sensei_int") == 0)
             {
                 is_int = atol(argv[++q]);
                 if (rank == 0)
-                    std::cerr << "in-situ processing every "
-                        << is_int << " iterations" << std::endl;
+                    std::cerr << " === newton++ === : in-situ processing every " << is_int << " iterations" << std::endl;
             }
         }
         else
         {
             if (rank == 0)
-                std::cerr << "unknown argument " << argv[q]
+                std::cerr << "Error: unknown argument " << argv[q]
                     << " at position " << q << std::endl;
             return -1;
         }
