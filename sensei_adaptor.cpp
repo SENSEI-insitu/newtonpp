@@ -58,12 +58,13 @@ GetBuffer(const std::string &anm, const patch_data *pd, const patch_force *pf)
 }
 
 // computes the min/max of the data.
-void GetMinMax(const hamr::buffer<double> &buf, long n_elem, double &mn, double &mx)
+template <typename T>
+void GetMinMax(const hamr::buffer<T> &buf, long n_elem, double &mn, double &mx)
 {
     mn = std::numeric_limits<double>::max();
     mx = std::numeric_limits<double>::lowest();
 
-    const double *pbuf = buf.data();
+    const T *pbuf = buf.data();
 
 /*#if defined(NEWTONPP_USE_OMP_LOOP)
     #pragma omp target teams loop is_device_ptr(pbuf), reduction(min:mn), reduction(max:mx)
@@ -72,8 +73,9 @@ void GetMinMax(const hamr::buffer<double> &buf, long n_elem, double &mn, double 
 //#endif
     for (long i = 0; i < n_elem; ++i)
     {
-        mn = pbuf[i] > mn ? mn : pbuf[i];
-        mx = pbuf[i] < mx ? mx : pbuf[i];
+        double pbuf_i = pbuf[i];
+        mn = pbuf_i > mn ? mn : pbuf_i;
+        mx = pbuf_i < mx ? mx : pbuf_i;
     }
 }
 
@@ -168,7 +170,7 @@ int sensei_adaptor::GetMeshMetadata(unsigned int id, sensei::MeshMetadataPtr &md
     }
     else
     {
-        md->NumArrays = 11;
+        md->NumArrays = 12;
         md->ArrayName = {"owner", "m", "x", "y", "z",
                          "vu", "vv", "vw", "id", "fu", "fv", "fw"};
 
@@ -217,9 +219,11 @@ int sensei_adaptor::GetMeshMetadata(unsigned int id, sensei::MeshMetadataPtr &md
 
     if (md->Flags.BlockArrayRangeSet())
     {
+        md->BlockArrayRange.resize(1);
+
         // rank
         md->ArrayRange.push_back({{(double)rank, (double)rank}});
-        md->BlockArrayRange.push_back({{(double)rank, (double)rank}});
+        md->BlockArrayRange[0].push_back({{(double)rank, (double)rank}});
 
         if (id != 0)
         {
@@ -229,57 +233,57 @@ int sensei_adaptor::GetMeshMetadata(unsigned int id, sensei::MeshMetadataPtr &md
             // m
             GetMinMax(m_bodies->m_m, nb, mn, mx);
             md->ArrayRange.push_back({{mn, mx}});
-            md->BlockArrayRange.push_back({{mn, mx}});
+            md->BlockArrayRange[0].push_back({{mn, mx}});
 
             // px
             GetMinMax(m_bodies->m_x, nb, mn, mx);
             md->ArrayRange.push_back({{mn, mx}});
-            md->BlockArrayRange.push_back({{mn, mx}});
+            md->BlockArrayRange[0].push_back({{mn, mx}});
 
             // py
             GetMinMax(m_bodies->m_y, nb, mn, mx);
             md->ArrayRange.push_back({{mn, mx}});
-            md->BlockArrayRange.push_back({{mn, mx}});
+            md->BlockArrayRange[0].push_back({{mn, mx}});
 
             // pz
             GetMinMax(m_bodies->m_z, nb, mn, mx);
             md->ArrayRange.push_back({{mn, mx}});
-            md->BlockArrayRange.push_back({{mn, mx}});
+            md->BlockArrayRange[0].push_back({{mn, mx}});
 
             // vu
             GetMinMax(m_bodies->m_u, nb, mn, mx);
             md->ArrayRange.push_back({{mn, mx}});
-            md->BlockArrayRange.push_back({{mn, mx}});
+            md->BlockArrayRange[0].push_back({{mn, mx}});
 
             // vv
             GetMinMax(m_bodies->m_v, nb, mn, mx);
             md->ArrayRange.push_back({{mn, mx}});
-            md->BlockArrayRange.push_back({{mn, mx}});
+            md->BlockArrayRange[0].push_back({{mn, mx}});
 
             // vw
             GetMinMax(m_bodies->m_w, nb, mn, mx);
             md->ArrayRange.push_back({{mn, mx}});
-            md->BlockArrayRange.push_back({{mn, mx}});
+            md->BlockArrayRange[0].push_back({{mn, mx}});
 
             // id
             GetMinMax(m_bodies->m_id, nb, mn, mx);
             md->ArrayRange.push_back({{mn, mx}});
-            md->BlockArrayRange.push_back({{mn, mx}});
+            md->BlockArrayRange[0].push_back({{mn, mx}});
 
             // fu
             GetMinMax(m_body_forces->m_u, nb, mn, mx);
             md->ArrayRange.push_back({{mn, mx}});
-            md->BlockArrayRange.push_back({{mn, mx}});
+            md->BlockArrayRange[0].push_back({{mn, mx}});
 
             // fv
             GetMinMax(m_body_forces->m_v, nb, mn, mx);
             md->ArrayRange.push_back({{mn, mx}});
-            md->BlockArrayRange.push_back({{mn, mx}});
+            md->BlockArrayRange[0].push_back({{mn, mx}});
 
             // fw
             GetMinMax(m_body_forces->m_w, nb, mn, mx);
             md->ArrayRange.push_back({{mn, mx}});
-            md->BlockArrayRange.push_back({{mn, mx}});
+            md->BlockArrayRange[0].push_back({{mn, mx}});
         }
     }
     return 0;
@@ -544,7 +548,7 @@ int sensei_adaptor::AddArray(svtkDataObject* mesh,
             else if (arrayName == "id")
             {
                 // zero-copy construct the VTK data array
-                auto buf = &m_pd->m_id;
+                auto buf = &m_bodies->m_id;
                 aout = svtkHAMRIntArray::New(arrayName, buf->pointer(), nb, 1,
                          buf->get_allocator(), buf->get_stream(), buf->get_transfer_mode(),
                          buf->get_owner());
