@@ -170,8 +170,9 @@ int initialize_random(MPI_Comm comm, long nb,
 
     if (rank == 0)
     {
-        std::cerr << "initialized " << tnb << " bodies on " << patches.size()
-            << " patches. h=" << h << " eps=" << eps << " nfr=" << nfr << std::endl;
+        std::cerr << " === newton++ === : initialized " << tnb << " bodies on "
+            << patches.size() << " patches. h=" << h << " eps=" << eps << " nfr="
+            << nfr << std::endl;
     }
 
     return 0;
