@@ -125,6 +125,13 @@ int parse_command_line(int argc, char **argv, MPI_Comm comm,
                 if (rank == 0)
                     std::cerr << " === newton++ === : in-situ processing every " << is_int << " iterations" << std::endl;
             }
+            else
+            {
+                if (rank == 0)
+                    std::cerr << "Error: unknown argument " << argv[q]
+                        << " at position " << q << std::endl;
+                return -1;
+            }
         }
         else
         {
