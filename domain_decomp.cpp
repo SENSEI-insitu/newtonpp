@@ -199,7 +199,7 @@ void assign_patches(std::vector<patch> &p, int n_ranks)
 }
 
 // --------------------------------------------------------------------------
-void partition(MPI_Comm comm, const std::vector<patch> &ps,
+void partition(MPI_Comm comm, const std::vector<patch> &hps,
     const patch_data &pd, hamr::buffer<int> &dest)
 {
     int rank = 0;
@@ -208,10 +208,10 @@ void partition(MPI_Comm comm, const std::vector<patch> &ps,
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &n_ranks);
 
-    long n = pd.size();
+    long nb = pd.size();
 
     // allocate space for the result
-    dest.resize(n);
+    dest.resize(nb);
     int *pdest = dest.data();
 
     // initialize to out of bounds. if a particle is not inside any patch
@@ -221,40 +221,56 @@ void partition(MPI_Comm comm, const std::vector<patch> &ps,
 #else
     #pragma omp target teams distribute parallel for is_device_ptr(pdest)
 #endif
-    for (long i = 0; i < n; ++i)
+    for (long i = 0; i < nb; ++i)
     {
         pdest[i] = -1;
     }
 
-    // assign each body a destination
-    // work patch by patch. this is inefficient since most of the time a
-    // particle will stay in place. however this is far easier to implement on
-    // the GPU, than working body by body, testing local patch first, and
-    // falling back to neighgbors, and then to the rest.
+    // collect the patch coordinates in an array indexable on the device. hps
+    // is a host side data structure. dps will be the device side equivalent.
+    int nps = hps.size();
+    hamr::buffer<const double*> dps(cpu_alloc(), nps);
+    const double **pdps = dps.data();
+    for (long i = 0; i < nps; ++i)
+    {
+        pdps[i] = hps[i].m_x.data();
+    }
+    dps.move(def_alloc());
+    pdps = dps.data();
+
+    // get the body positions
     const double *pd_x = pd.m_x.data();
     const double *pd_y = pd.m_y.data();
     const double *pd_z = pd.m_z.data();
 
-    int nps = ps.size();
-    for (int j = 0; j < nps; ++j)
-    {
-        // get the patch corners
-        const double *p_x = ps[j].m_x.data();
-
-        // test each body to see if it's inside this patch
+    // test each body to see if it's inside this patch
 #if defined(NEWTONPP_USE_OMP_LOOP)
-        #pragma omp target teams loop is_device_ptr(pd_x,pd_y,pd_z,p_x,pdest)
+    #pragma omp target teams loop is_device_ptr(pd_x,pd_y,pd_z,pdps,pdest) map(to:rank)
 #else
-        #pragma omp target teams distribute parallel for is_device_ptr(pd_x,pd_y,pd_z,p_x,pdest)
+    #pragma omp target teams distribute parallel for is_device_ptr(pd_x,pd_y,pd_z,pdps,pdest) map(to:rank)
 #endif
-        for (long i = 0; i < n; ++i)
+    for (long i = 0; i < nb; ++i)
+    {
+        // a particle will most likely stay on the patch
+        const double *p_x = pdps[rank];
+        if ((pd_x[i] >= p_x[0]) && (pd_x[i] < p_x[1]) &&
+            (pd_y[i] >= p_x[2]) && (pd_y[i] < p_x[3]) &&
+            (pd_z[i] >= p_x[4]) && (pd_z[i] < p_x[5]))
         {
-            if ((pdest[i] < 0) &&
-               (pd_x[i] >= p_x[0]) && (pd_x[i] < p_x[1]) &&
-               (pd_y[i] >= p_x[2]) && (pd_y[i] < p_x[3]) &&
-               (pd_z[i] >= p_x[4]) && (pd_z[i] < p_x[5]))
+            pdest[i] = rank;
+        }
+        else
+        {
+            // scan the other patches
+            for (int j = 0; j < nps; ++j)
             {
-                pdest[i] = j;
+                p_x = pdps[j];
+                if ((pd_x[i] >= p_x[0]) && (pd_x[i] < p_x[1]) &&
+                    (pd_y[i] >= p_x[2]) && (pd_y[i] < p_x[3]) &&
+                    (pd_z[i] >= p_x[4]) && (pd_z[i] < p_x[5]))
+                {
+                    pdest[i] = j;
+                }
             }
         }
     }
