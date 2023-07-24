@@ -91,7 +91,7 @@ void split(int dir, const double *p0_x, double *p1_x, double *p2_x)
         p1_x[4] = p0_x[4];
         p1_x[5] = (p0_x[4] + p0_x[5]) / 2.;
 
-        p2_x[0] = p0_x[1];
+        p2_x[0] = p0_x[0];
         p2_x[1] = p0_x[1];
         p2_x[2] = p0_x[2];
         p2_x[3] = p0_x[3];
