@@ -147,6 +147,38 @@ void isend(MPI_Comm comm, const patch_data &pd,
 }
 
 // --------------------------------------------------------------------------
+void send(MPI_Comm comm, const patch_data &pd,
+    const patch_force &pf, int dest, int tag)
+{
+    long n = pd.size();
+    MPI_Send(&n, 1, MPI_LONG, dest, tag, comm);
+
+    if (n)
+    {
+#if defined(NEWTONPP_GPU_DIRECT)
+        auto [pd_m, pd_x, pd_y, pd_z, pd_u, pd_v, pd_w, pd_id] = pd.get_data();
+        auto [pf_u, pf_v, pf_w] = pf.get_data();
+#else
+        auto [spd_m, pd_m, spd_x, pd_x, spd_y, pd_y, spd_z, pd_z,
+              spd_u, pd_u, spd_v, pd_v, spd_w, pd_w, spd_id, pd_id] = pd.get_host_accessible();
+
+        auto [spf_u, pf_u, spf_v, pf_v, spf_w, pf_w] = pf.get_host_accessible();
+#endif
+        MPI_Send(pd_m, n, MPI_DOUBLE, dest, ++tag, comm);
+        MPI_Send(pd_x, n, MPI_DOUBLE, dest, ++tag, comm);
+        MPI_Send(pd_y, n, MPI_DOUBLE, dest, ++tag, comm);
+        MPI_Send(pd_z, n, MPI_DOUBLE, dest, ++tag, comm);
+        MPI_Send(pd_u, n, MPI_DOUBLE, dest, ++tag, comm);
+        MPI_Send(pd_v, n, MPI_DOUBLE, dest, ++tag, comm);
+        MPI_Send(pd_w, n, MPI_DOUBLE, dest, ++tag, comm);
+        MPI_Send(pd_id,n, MPI_INT,    dest, ++tag, comm);
+        MPI_Send(pf_u, n, MPI_DOUBLE, dest, ++tag, comm);
+        MPI_Send(pf_v, n, MPI_DOUBLE, dest, ++tag, comm);
+        MPI_Send(pf_w, n, MPI_DOUBLE, dest, ++tag, comm);
+    }
+}
+
+// --------------------------------------------------------------------------
 void recv(MPI_Comm comm, patch_data &pd, patch_force &pf, int src, int tag)
 {
     long n = 0;

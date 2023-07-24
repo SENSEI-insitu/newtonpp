@@ -31,6 +31,7 @@ void isend(MPI_Comm comm, const patch_force &pf, int dest, int tag);
 void recv(MPI_Comm comm, patch_force &pf, int src, int tag);
 
 /// send/receive bodies and per-body forces
+void send(MPI_Comm comm, const patch_data &pd, const patch_force &pf, int dest, int tag);
 void isend(MPI_Comm comm, const patch_data &pd, const patch_force &pf, int dest, int tag, requests &reqs);
 void recv(MPI_Comm comm, patch_data &pd, patch_force &pf, int src, int tag);
 
