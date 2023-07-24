@@ -7,7 +7,7 @@
 // --------------------------------------------------------------------------
 int parse_command_line(int argc, char **argv, MPI_Comm comm,
     double &G, double &dt, double &eps, double &theta,
-    long &n_its, long &n_bodies, const char *&magi_h5,
+    long &n_its, long &n_bodies, long &part_int, const char *&magi_h5,
     const char *&magi_sum, const char *&out_dir, long &io_int,
     const char *&is_conf, long &is_int)
 {
@@ -29,6 +29,7 @@ int parse_command_line(int argc, char **argv, MPI_Comm comm,
                     << "    --theta      : threshold for reduced representation" << std::endl
                     << "    --n_its      : how many iterations to perform" << std::endl
                     << "    --n_bodies   : the total number of bodies" << std::endl
+                    << "    --part_int : how often to repartition particles" << std::endl
                     << "    --magi_h5    : MAGI file with particle positions" << std::endl
                     << "    --magi_sum   : MAGI file with component sizes" << std::endl
                     << "    --out_dir    : where to write the results" << std::endl
@@ -77,6 +78,12 @@ int parse_command_line(int argc, char **argv, MPI_Comm comm,
                 n_bodies = atol(argv[++q]);
                 if (rank == 0)
                     std::cerr << " === newton++ === : will generate " << n_bodies << " bodies total" << std::endl;
+            }
+            else if(strcmp(argv[q], "--part_int") == 0)
+            {
+                part_int = atol(argv[++q]);
+                if (rank == 0)
+                    std::cerr << " === newton++ === : will partition particles every " << part_int << " iterations" << std::endl;
             }
             else if(strcmp(argv[q], "--magi_h5") == 0)
             {

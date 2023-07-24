@@ -74,6 +74,7 @@ int main(int argc, char **argv)
     double G = 6.67408e-11;         // the gravitational constant
     long n_its = 0;                 // number of solver steps
     long n_bodies = 0;              // number of bodies
+    long part_int = 10;             // how often to partition particles
     const char *magi_h5 = nullptr;  // where initial positions/velocities can be found
     const char *magi_sum = nullptr; // where particle types can be found
     const char *out_dir = nullptr;  // directory to write results at
@@ -81,8 +82,8 @@ int main(int argc, char **argv)
     const char *is_conf = nullptr;  // sensei in situ configuration file
     long is_int = 0;                // how often to invoke in situ processing
 
-    if (parse_command_line(argc, argv, comm, G, h, eps, nfr, n_its,
-        n_bodies, magi_h5, magi_sum, out_dir, io_int, is_conf, is_int))
+    if (parse_command_line(argc, argv, comm, G, h, eps, nfr, n_its, n_bodies,
+        part_int, magi_h5, magi_sum, out_dir, io_int, is_conf, is_int))
         return -1;
 
     // load the initial condition and initialize the bodies
@@ -106,7 +107,6 @@ int main(int argc, char **argv)
         if (n_ranks > 1)
         {
             pf.resize(pd.size());
-
             hamr::buffer<int> dest(def_alloc());
             partition(comm, patches, pd, dest);
             move(comm, pd, pf, dest);
@@ -175,13 +175,14 @@ int main(int argc, char **argv)
         timer.pop("integrate part");
 
         // update partition
-        //if (n_ranks > 1)
+        if ((it % part_int) == 0)
         {
             timer.push();
             hamr::buffer<int> dest(def_alloc());
             partition(comm, patches, pd, dest);
+            timer.pop_push("partition part");
             move(comm, pd, pf, dest);
-            timer.pop("partition part");
+            timer.pop("move part");
         }
 
         // write current state
