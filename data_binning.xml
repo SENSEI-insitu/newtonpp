@@ -1,55 +1,218 @@
 <sensei>
-  <!-- x-y -->
+  <!-- x y -->
   <analysis type="DataBinning"
     mesh="bodies" x_axis="x" y_axis="y" out_dir="bin_out"
-    xres="128" yres="128" verbose="1" device_id="0" async="1" enabled="1">
+    xres="128" yres="128" verbose="0" device_id="-2" async="0" enabled="1">
     <arrays>
-      m vu vv vw fu fv fw
-      m vu vv vw fu fv fw
-      m vu vv vw fu fv fw
-      m vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
     </arrays>
     <operations>
-      sum sum sum sum sum sum sum
-      min min min min min min min
-      max max max max max max max
-      avg avg avg avg avg avg avg
+      sum sum sum sum sum sum sum sum sum sum
+      min min min min min min min min min min
+      max max max max max max max max max max
+      avg avg avg avg avg avg avg avg avg avg
     </operations>
   </analysis>
 
-  <!-- x-z -->
+  <!-- x z -->
   <analysis type="DataBinning"
     mesh="bodies" x_axis="x" y_axis="z" out_dir="bin_out"
-    xres="128" yres="128" verbose="1" device_id="0" async="1" enabled="1">
+    xres="128" yres="128" verbose="0" device_id="-2" async="0" enabled="1">
     <arrays>
-      m vu vv vw fu fv fw
-      m vu vv vw fu fv fw
-      m vu vv vw fu fv fw
-      m vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
     </arrays>
     <operations>
-      sum sum sum sum sum sum sum
-      min min min min min min min
-      max max max max max max max
-      avg avg avg avg avg avg avg
+      sum sum sum sum sum sum sum sum sum sum
+      min min min min min min min min min min
+      max max max max max max max max max max
+      avg avg avg avg avg avg avg avg avg avg
     </operations>
   </analysis>
 
-  <!-- y-z -->
+  <!-- y z -->
   <analysis type="DataBinning"
     mesh="bodies" x_axis="y" y_axis="z" out_dir="bin_out"
-    xres="128" yres="128" verbose="1" device_id="0" async="1" enabled="1">
+    xres="128" yres="128" verbose="0" device_id="-2" async="0" enabled="1">
     <arrays>
-      m vu vv vw fu fv fw
-      m vu vv vw fu fv fw
-      m vu vv vw fu fv fw
-      m vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
     </arrays>
     <operations>
-      sum sum sum sum sum sum sum
-      min min min min min min min
-      max max max max max max max
-      avg avg avg avg avg avg avg
+      sum sum sum sum sum sum sum sum sum sum
+      min min min min min min min min min min
+      max max max max max max max max max max
+      avg avg avg avg avg avg avg avg avg avg
     </operations>
   </analysis>
+
+  <!-- x vu -->
+  <analysis type="DataBinning"
+    mesh="bodies" x_axis="x" y_axis="vu" out_dir="bin_out"
+    xres="128" yres="128" verbose="0" device_id="-2" async="0" enabled="1">
+    <arrays>
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+    </arrays>
+    <operations>
+      sum sum sum sum sum sum sum sum sum sum
+      min min min min min min min min min min
+      max max max max max max max max max max
+      avg avg avg avg avg avg avg avg avg avg
+    </operations>
+  </analysis>
+
+  <!-- x vv -->
+  <analysis type="DataBinning"
+    mesh="bodies" x_axis="x" y_axis="vv" out_dir="bin_out"
+    xres="128" yres="128" verbose="0" device_id="-2" async="0" enabled="1">
+    <arrays>
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+    </arrays>
+    <operations>
+      sum sum sum sum sum sum sum sum sum sum
+      min min min min min min min min min min
+      max max max max max max max max max max
+      avg avg avg avg avg avg avg avg avg avg
+    </operations>
+  </analysis>
+
+  <!-- x vw -->
+  <analysis type="DataBinning"
+    mesh="bodies" x_axis="x" y_axis="vw" out_dir="bin_out"
+    xres="128" yres="128" verbose="0" device_id="-2" async="0" enabled="1">
+    <arrays>
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+    </arrays>
+    <operations>
+      sum sum sum sum sum sum sum sum sum sum
+      min min min min min min min min min min
+      max max max max max max max max max max
+      avg avg avg avg avg avg avg avg avg avg
+    </operations>
+  </analysis>
+
+  <!-- y vu -->
+  <analysis type="DataBinning"
+    mesh="bodies" x_axis="y" y_axis="vu" out_dir="bin_out"
+    xres="128" yres="128" verbose="0" device_id="-2" async="0" enabled="1">
+    <arrays>
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+    </arrays>
+    <operations>
+      sum sum sum sum sum sum sum sum sum sum
+      min min min min min min min min min min
+      max max max max max max max max max max
+      avg avg avg avg avg avg avg avg avg avg
+    </operations>
+  </analysis>
+
+  <!-- y vv -->
+  <analysis type="DataBinning"
+    mesh="bodies" x_axis="y" y_axis="vv" out_dir="bin_out"
+    xres="128" yres="128" verbose="0" device_id="-2" async="0" enabled="1">
+    <arrays>
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+    </arrays>
+    <operations>
+      sum sum sum sum sum sum sum sum sum sum
+      min min min min min min min min min min
+      max max max max max max max max max max
+      avg avg avg avg avg avg avg avg avg avg
+    </operations>
+  </analysis>
+
+  <!-- y vw -->
+  <analysis type="DataBinning"
+    mesh="bodies" x_axis="y" y_axis="vw" out_dir="bin_out"
+    xres="128" yres="128" verbose="0" device_id="-2" async="0" enabled="1">
+    <arrays>
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+    </arrays>
+    <operations>
+      sum sum sum sum sum sum sum sum sum sum
+      min min min min min min min min min min
+      max max max max max max max max max max
+      avg avg avg avg avg avg avg avg avg avg
+    </operations>
+  </analysis>
+
+  <!-- z vu -->
+  <analysis type="DataBinning"
+    mesh="bodies" x_axis="z" y_axis="vu" out_dir="bin_out"
+    xres="128" yres="128" verbose="0" device_id="-2" async="0" enabled="1">
+    <arrays>
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+    </arrays>
+    <operations>
+      sum sum sum sum sum sum sum sum sum sum
+      min min min min min min min min min min
+      max max max max max max max max max max
+      avg avg avg avg avg avg avg avg avg avg
+    </operations>
+  </analysis>
+
+  <!-- z vv -->
+  <analysis type="DataBinning"
+    mesh="bodies" x_axis="z" y_axis="vv" out_dir="bin_out"
+    xres="128" yres="128" verbose="0" device_id="-2" async="0" enabled="1">
+    <arrays>
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+    </arrays>
+    <operations>
+      sum sum sum sum sum sum sum sum sum sum
+      min min min min min min min min min min
+      max max max max max max max max max max
+      avg avg avg avg avg avg avg avg avg avg
+    </operations>
+  </analysis>
+
+  <!-- z vw -->
+  <analysis type="DataBinning"
+    mesh="bodies" x_axis="z" y_axis="vw" out_dir="bin_out"
+    xres="128" yres="128" verbose="0" device_id="-2" async="0" enabled="1">
+    <arrays>
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+      m x y z vu vv vw fu fv fw
+    </arrays>
+    <operations>
+      sum sum sum sum sum sum sum sum sum sum
+      min min min min min min min min min min
+      max max max max max max max max max max
+      avg avg avg avg avg avg avg avg avg avg
+    </operations>
+  </analysis>
+
 </sensei>
