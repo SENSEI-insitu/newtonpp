@@ -4,6 +4,9 @@
 
 #include <deque>
 #include <math.h>
+#if defined(_OPENMP)
+#include <omp.h>
+#endif
 
 // --------------------------------------------------------------------------
 void near(const std::vector<patch> &p, double nfr, std::vector<int> &nf)
@@ -227,16 +230,20 @@ void partition(MPI_Comm comm, const std::vector<patch> &hps,
     }
 
     // collect the patch coordinates in an array indexable on the device. hps
-    // is a host side data structure. dps will be the device side equivalent.
+    // is a host side data structure. pdps will be the device side equivalent.
     int nps = hps.size();
-    hamr::buffer<const double*> dps(cpu_alloc(), nps);
-    const double **pdps = dps.data();
+    std::vector<const double*> dps(nps);
     for (long i = 0; i < nps; ++i)
-    {
-        pdps[i] = hps[i].m_x.data();
-    }
-    dps.move(def_alloc());
-    pdps = dps.data();
+        dps[i] = hps[i].m_x.data();
+#if defined(_OPENMP)
+    size_t n_bytes = nps*sizeof(double*);
+    int dev_id = omp_get_default_device();
+    int host_id = omp_get_initial_device();
+    double **pdps = (double**)omp_target_alloc(n_bytes, dev_id);
+    omp_target_memcpy(pdps, dps.data(), n_bytes, 0, 0, dev_id, host_id);
+#else
+    const double **pdps = dps.data();
+#endif
 
     // get the body positions
     const double *pd_x = pd.m_x.data();
@@ -274,6 +281,9 @@ void partition(MPI_Comm comm, const std::vector<patch> &hps,
             }
         }
     }
+#if defined(_OPENMP)
+    omp_target_free(pdps, dev_id);
+#endif
 }
 
 // --------------------------------------------------------------------------
