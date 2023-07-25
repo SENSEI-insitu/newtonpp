@@ -74,7 +74,7 @@ int main(int argc, char **argv)
     double G = 6.67408e-11;         // the gravitational constant
     long n_its = 0;                 // number of solver steps
     long n_bodies = 0;              // number of bodies
-    long part_int = 10;             // how often to partition particles
+    long part_int = 4;              // how often to partition particles
     const char *magi_h5 = nullptr;  // where initial positions/velocities can be found
     const char *magi_sum = nullptr; // where particle types can be found
     const char *out_dir = nullptr;  // directory to write results at
@@ -109,7 +109,7 @@ int main(int argc, char **argv)
             pf.resize(pd.size());
             hamr::buffer<int> dest(def_alloc());
             partition(comm, patches, pd, dest);
-            move(comm, pd, pf, dest);
+            move2(comm, pd, pf, dest);
         }
     }
     else
@@ -181,7 +181,7 @@ int main(int argc, char **argv)
             hamr::buffer<int> dest(def_alloc());
             partition(comm, patches, pd, dest);
             timer.pop_push("partition part");
-            move(comm, pd, pf, dest);
+            move2(comm, pd, pf, dest);
             timer.pop("move part");
         }
 

@@ -35,4 +35,14 @@ void send(MPI_Comm comm, const patch_data &pd, const patch_force &pf, int dest, 
 void isend(MPI_Comm comm, const patch_data &pd, const patch_force &pf, int dest, int tag, requests &reqs);
 void recv(MPI_Comm comm, patch_data &pd, patch_force &pf, int src, int tag);
 
+
+/// gather incoming to rank
+void gather(MPI_Comm comm, patch_data &pdo, patch_force &pfo,
+    const patch_data &pdi, const patch_force &pfi, int rank,
+    int *lengths, int *offsets, long n_total);
+
+/// send outgoing to rank
+void gather(MPI_Comm comm, const patch_data &pdi, const patch_force &pfi, int rank);
+
+
 #endif

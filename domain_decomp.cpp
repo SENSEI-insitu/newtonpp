@@ -277,7 +277,7 @@ void partition(MPI_Comm comm, const std::vector<patch> &hps,
 }
 
 // --------------------------------------------------------------------------
-void package(const patch_data &pdi, const patch_force &pfi,
+long package(const patch_data &pdi, const patch_force &pfi,
     const hamr::buffer<int> &dest, int rank, patch_data &pdo, patch_force &pfo)
 {
     long ni = pdi.size();
@@ -331,6 +331,8 @@ void package(const patch_data &pdi, const patch_force &pfi,
     // adjust size to reflect contents
     pdo.resize(no);
     pfo.resize(no);
+
+    return no;
 }
 
 // --------------------------------------------------------------------------
@@ -393,6 +395,82 @@ void move(MPI_Comm comm, patch_data &pd, patch_force &pf, const hamr::buffer<int
             // wait for sends to complete
             if (reqs.m_size)
                 MPI_Waitall(reqs.m_size, reqs.m_req, MPI_STATUS_IGNORE);
+        }
+    }
+
+    pd = std::move(pdo);
+    pf = std::move(pfo);
+}
+
+
+/// buffers with data to send to rank j
+struct comm_buffer
+{
+    patch_data m_pd;
+    patch_force m_pf;
+};
+
+
+// --------------------------------------------------------------------------
+void move2(MPI_Comm comm, patch_data &pd, patch_force &pf, const hamr::buffer<int> &dest)
+{
+    patch_data pdo;
+    patch_force pfo;
+
+    int rank = 0;
+    int n_ranks = 1;
+
+    MPI_Comm_rank(comm, &rank);
+    MPI_Comm_size(comm, &n_ranks);
+
+    size_t n_elem = n_ranks*n_ranks;
+
+    std::vector<int> sizes(n_elem, 0l);
+    std::vector<comm_buffer> buffers(n_elem);
+
+    // package data to send to rank j, and store the length of the buffer in a
+    // row of the matrix
+    for (int j = 0; j < n_ranks; ++j)
+    {
+        int q = rank * n_ranks + j;
+        auto &buf_q = buffers[q];
+        sizes[q] = package(pd, pf, dest, j, buf_q.m_pd, buf_q.m_pf);
+    }
+
+    // build the table of buffer sizes, from this we can execute matching
+    // communication operations to send/recv bodies. now the matrix tells
+    // how much data moves between each rank
+    MPI_Allgather(MPI_IN_PLACE, n_ranks, MPI_INT, sizes.data(), n_ranks, MPI_INT, comm);
+
+    // gather
+    for (int j = 0; j < n_ranks; ++j)
+    {
+        int q = rank * n_ranks + j;
+        auto &buf_q = buffers[q];
+
+        if (j == rank)
+        {
+            // this rank's turn to recv data
+            // figure out how much data is in coming
+            long n_total = 0;
+            std::vector<int> counts(n_ranks, 0);
+            std::vector<int> offsets(n_ranks, 0);
+            for (int i = 0; i < n_ranks; ++i)
+            {
+                int n = sizes[i * n_ranks + rank];
+                counts[i] = n;
+                offsets[i] = n_total;
+                n_total += n;
+            }
+
+            // recv from all
+            gather(comm, pdo, pfo, buf_q.m_pd, buf_q.m_pf,
+                   rank, counts.data(), offsets.data(), n_total);
+        }
+        else
+        {
+            // send to j
+            gather(comm, buf_q.m_pd, buf_q.m_pf, j);
         }
     }
 

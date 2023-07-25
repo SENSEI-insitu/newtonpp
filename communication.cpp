@@ -231,3 +231,90 @@ void recv(MPI_Comm comm, patch_data &pd, patch_force &pf, int src, int tag)
         pf.m_w = std::move(tpf_w);
     }
 }
+
+// --------------------------------------------------------------------------
+void gather(MPI_Comm comm, patch_data &pdo, patch_force &pfo,
+    const patch_data &pdi, const patch_force &pfi, int rank,
+    int *lengths, int *offsets, long n_total)
+{
+#if defined(NEWTONPP_GPU_DIRECT)
+    auto alloc = gpu_alloc();
+#else
+    auto alloc = cpu_alloc();
+#endif
+    hamr::buffer<double> tpd_m(alloc, n_total);
+    hamr::buffer<double> tpd_x(alloc, n_total);
+    hamr::buffer<double> tpd_y(alloc, n_total);
+    hamr::buffer<double> tpd_z(alloc, n_total);
+    hamr::buffer<double> tpd_u(alloc, n_total);
+    hamr::buffer<double> tpd_v(alloc, n_total);
+    hamr::buffer<double> tpd_w(alloc, n_total);
+    hamr::buffer<int>   tpd_id(alloc, n_total);
+    hamr::buffer<double> tpf_u(alloc, n_total);
+    hamr::buffer<double> tpf_v(alloc, n_total);
+    hamr::buffer<double> tpf_w(alloc, n_total);
+
+#if defined(NEWTONPP_GPU_DIRECT)
+    auto [pdi_m, pdi_x, pdi_y, pdi_z, pdi_u, pdi_v, pdi_w, pdi_id] = pdi.get_data();
+    auto [pfi_u, pfi_v, pfi_w] = pfi.get_data();
+#else
+    auto [spdi_m, pdi_m, spdi_x, pdi_x, spdi_y, pdi_y, spdi_z, pdi_z,
+          spdi_u, pdi_u, spdi_v, pdi_v, spdi_w, pdi_w, spdi_id, pdi_id] = pdi.get_host_accessible();
+
+    auto [spfi_u, pfi_u, spfi_v, pfi_v, spfi_w, pfi_w] = pfi.get_host_accessible();
+#endif
+
+    int n_in = pdi.size();
+
+    MPI_Gatherv(pdi_m, n_in, MPI_DOUBLE, tpd_m.data(), lengths, offsets, MPI_DOUBLE, rank, comm);
+    MPI_Gatherv(pdi_x, n_in, MPI_DOUBLE, tpd_x.data(), lengths, offsets, MPI_DOUBLE, rank, comm);
+    MPI_Gatherv(pdi_y, n_in, MPI_DOUBLE, tpd_y.data(), lengths, offsets, MPI_DOUBLE, rank, comm);
+    MPI_Gatherv(pdi_z, n_in, MPI_DOUBLE, tpd_z.data(), lengths, offsets, MPI_DOUBLE, rank, comm);
+    MPI_Gatherv(pdi_u, n_in, MPI_DOUBLE, tpd_u.data(), lengths, offsets, MPI_DOUBLE, rank, comm);
+    MPI_Gatherv(pdi_v, n_in, MPI_DOUBLE, tpd_v.data(), lengths, offsets, MPI_DOUBLE, rank, comm);
+    MPI_Gatherv(pdi_w, n_in, MPI_DOUBLE, tpd_w.data(), lengths, offsets, MPI_DOUBLE, rank, comm);
+    MPI_Gatherv(pdi_id,n_in, MPI_INT,    tpd_id.data(),lengths, offsets, MPI_INT,    rank, comm);
+    MPI_Gatherv(pfi_u, n_in, MPI_DOUBLE, tpf_u.data(), lengths, offsets, MPI_DOUBLE, rank, comm);
+    MPI_Gatherv(pfi_v, n_in, MPI_DOUBLE, tpf_v.data(), lengths, offsets, MPI_DOUBLE, rank, comm);
+    MPI_Gatherv(pfi_w, n_in, MPI_DOUBLE, tpf_w.data(), lengths, offsets, MPI_DOUBLE, rank, comm);
+
+    pdo.m_m = std::move(tpd_m);
+    pdo.m_x = std::move(tpd_x);
+    pdo.m_y = std::move(tpd_y);
+    pdo.m_z = std::move(tpd_z);
+    pdo.m_u = std::move(tpd_u);
+    pdo.m_v = std::move(tpd_v);
+    pdo.m_w = std::move(tpd_w);
+    pdo.m_id = std::move(tpd_id);
+    pfo.m_u = std::move(tpf_u);
+    pfo.m_v = std::move(tpf_v);
+    pfo.m_w = std::move(tpf_w);
+}
+
+// --------------------------------------------------------------------------
+void gather(MPI_Comm comm, const patch_data &pdi, const patch_force &pfi, int rank)
+{
+#if defined(NEWTONPP_GPU_DIRECT)
+    auto [pdi_m, pdi_x, pdi_y, pdi_z, pdi_u, pdi_v, pdi_w, pdi_id] = pdi.get_data();
+    auto [pfi_u, pfi_v, pfi_w] = pfi.get_data();
+#else
+    auto [spdi_m, pdi_m, spdi_x, pdi_x, spdi_y, pdi_y, spdi_z, pdi_z,
+          spdi_u, pdi_u, spdi_v, pdi_v, spdi_w, pdi_w, spdi_id, pdi_id] = pdi.get_host_accessible();
+
+    auto [spfi_u, pfi_u, spfi_v, pfi_v, spfi_w, pfi_w] = pfi.get_host_accessible();
+#endif
+
+    int n_in = pdi.size();
+
+    MPI_Gatherv(pdi_m, n_in, MPI_DOUBLE, nullptr, nullptr, nullptr, MPI_DOUBLE, rank, comm);
+    MPI_Gatherv(pdi_x, n_in, MPI_DOUBLE, nullptr, nullptr, nullptr, MPI_DOUBLE, rank, comm);
+    MPI_Gatherv(pdi_y, n_in, MPI_DOUBLE, nullptr, nullptr, nullptr, MPI_DOUBLE, rank, comm);
+    MPI_Gatherv(pdi_z, n_in, MPI_DOUBLE, nullptr, nullptr, nullptr, MPI_DOUBLE, rank, comm);
+    MPI_Gatherv(pdi_u, n_in, MPI_DOUBLE, nullptr, nullptr, nullptr, MPI_DOUBLE, rank, comm);
+    MPI_Gatherv(pdi_v, n_in, MPI_DOUBLE, nullptr, nullptr, nullptr, MPI_DOUBLE, rank, comm);
+    MPI_Gatherv(pdi_w, n_in, MPI_DOUBLE, nullptr, nullptr, nullptr, MPI_DOUBLE, rank, comm);
+    MPI_Gatherv(pdi_id,n_in, MPI_INT,    nullptr, nullptr, nullptr, MPI_INT,    rank, comm);
+    MPI_Gatherv(pfi_u, n_in, MPI_DOUBLE, nullptr, nullptr, nullptr, MPI_DOUBLE, rank, comm);
+    MPI_Gatherv(pfi_v, n_in, MPI_DOUBLE, nullptr, nullptr, nullptr, MPI_DOUBLE, rank, comm);
+    MPI_Gatherv(pfi_w, n_in, MPI_DOUBLE, nullptr, nullptr, nullptr, MPI_DOUBLE, rank, comm);
+}

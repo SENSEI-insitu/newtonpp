@@ -43,12 +43,13 @@ void partition(MPI_Comm comm, const std::vector<patch> &ps,
 /** given a set of bodies, per-body forces, and a mapping of bodies to MPI
  * ranks, package the bodies belonging to rank for shipment to that rank
  */
-void package(const patch_data &pdi, const patch_force &pfi,
+long package(const patch_data &pdi, const patch_force &pfi,
     const hamr::buffer<int> &dest, int rank, patch_data &pdo, patch_force &pfo);
 
 /** given a mapping of bodies to MPI ranks package and ship. shipped bodies are
  * removed from the local data.
  */
 void move(MPI_Comm comm, patch_data &pd, patch_force &pf, const hamr::buffer<int> &dest);
+void move2(MPI_Comm comm, patch_data &pd, patch_force &pf, const hamr::buffer<int> &dest);
 
 #endif
