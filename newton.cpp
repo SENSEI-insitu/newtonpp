@@ -18,6 +18,9 @@
 #include <iostream>
 #include <vector>
 #include <mpi.h>
+#if defined(_OPENMP)
+#include <omp.h>
+#endif
 
 #include <chrono>
 using namespace std::literals;
@@ -67,6 +70,7 @@ int main(int argc, char **argv)
 
     timer_stack timer(rank == 0);
     timer.push();
+    timer.push();
 
     double h = 1e5;                 // time step size
     double nfr = 0.;                // distance for reduced representation
@@ -81,16 +85,31 @@ int main(int argc, char **argv)
     long io_int = 0;                // how often to write resutls
     const char *is_conf = nullptr;  // sensei in situ configuration file
     long is_int = 0;                // how often to invoke in situ processing
+#if defined(_OPENMP)
+    int num_devs = omp_get_num_devices();
+#else
+    int num_devs = 1;
+#endif
+    int start_dev = 0;
+    int dev_stride = 1;
 
-    if (parse_command_line(argc, argv, comm, G, h, eps, nfr, n_its, n_bodies,
-        part_int, magi_h5, magi_sum, out_dir, io_int, is_conf, is_int))
+    if (parse_command_line(argc, argv, comm, num_devs, start_dev, dev_stride,
+        G, h, eps, nfr, n_its, n_bodies, part_int, magi_h5, magi_sum, out_dir,
+        io_int, is_conf, is_int))
         return -1;
+
+#if defined(_OPENMP)
+    // set the device to use
+    int dev = rank % num_devs * dev_stride + start_dev;
+    omp_set_default_device(dev);
+#endif
 
     // load the initial condition and initialize the bodies
     patch_data pd;
     patch_force pf;
     std::vector<patch> patches;
 
+    timer.push();
 #if defined(NEWTONPP_ENABLE_MAGI)
     if (magi_h5)
     {
@@ -118,56 +137,66 @@ int main(int argc, char **argv)
         if (initialize_random(comm, n_bodies, patches, pd, h, eps, nfr))
             return -1;
     }
-    timer.pop_push("read ic");
+    timer.pop("read ic");
 
 #if defined(NEWTONPP_ENABLE_SENSEI)
     // initialize for in-situ
     insitu_data is_data;
     if (is_conf && is_int)
     {
+        timer.push();
         if (init_insitu(comm, is_conf, is_data))
             return -1;
-        timer.pop_push("sensei init");
+        timer.pop("sensei init");
     }
 #endif
 
     // write the domain decomp
     if (io_int)
     {
+        timer.push();
         write_vtk(comm, patches, out_dir);
-        timer.pop_push("write dom");
+        timer.pop("write dom");
     }
 
     // flag nearby patches
+    timer.push();
     std::vector<int> nf;
     near(patches, nfr, nf);
-    timer.pop_push("build tree");
+    timer.pop("build tree");
 
     // initialize forces
+    timer.push();
     forces(comm, pd, pf, G, eps, nf);
-    timer.pop_push("init forces");
+    timer.pop("init forces");
 
     // write initial state
     if (io_int)
     {
+        timer.push();
         write_vtk(comm, pd, pf, out_dir);
-        timer.pop_push("write part");
+        timer.pop("write part");
     }
 
 #if defined(NEWTONPP_ENABLE_SENSEI)
     // process initial state
     if (is_int && is_data)
     {
+        timer.push();
         if (update_insitu(comm, is_data, 0, 0, patches, pd, pf))
             return -1;
-        timer.pop_push("sensei upd");
+        timer.pop("sensei upd");
     }
 #endif
+    timer.pop("=== initialization ===");
 
     // iterate
     long it = 0;
     while (it < n_its)
     {
+#if defined(_OPENMP)
+        omp_set_default_device(dev);
+#endif
         // update bodies
         timer.push();
         timer.push();
@@ -204,9 +233,8 @@ int main(int argc, char **argv)
         }
 #endif
         it += 1;
-        timer.pop("iteration");
+        timer.pop("=== loop iteration ===");
     }
-    timer.pop("main loop");
 
 #if defined(NEWTONPP_ENABLE_SENSEI)
     // finalize in-situ processing
