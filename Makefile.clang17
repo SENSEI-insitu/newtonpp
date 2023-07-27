@@ -80,7 +80,7 @@ stream_compact.a: stream_compact.cu stream_compact.cxx
 	ranlib stream_compact.a
 
 %.o: %.cpp
-	$(CC) $(OMP_FLAGS) $(MPI_FLAGS) $(CFLAGS) $(C_OPT_FLAGS) $(HAMR_FLAGS) $(SENSEI_FLAGS) -I./ -c $< -o $@
+	$(CC) $(OMP_FLAGS) $(MPI_FLAGS) $(HDF5_FLAGS) $(CFLAGS) $(C_OPT_FLAGS) $(HAMR_FLAGS) $(SENSEI_FLAGS) -I./ -c $< -o $@
 
 newtonpp_objs=domain_decomp.o initialize_file.o patch_data.o communication.o \
 	 initialize_random.o patch.o patch_force.o solver.o write_vtk.o command_line.o \
@@ -96,9 +96,9 @@ endif
 
 
 newtonpp_clang_omp:  stream_compact.a $(newtonpp_objs) newton.cpp
-	$(CC) $(OMP_FLAGS) $(MPI_FLAGS) $(CFLAGS) $(C_OPT_FLAGS) $(HAMR_FLAGS) $(SENSEI_FLAGS) -I./ \
+	$(CC) $(OMP_FLAGS) $(MPI_FLAGS) $(HDF5_FLAGS) $(CFLAGS) $(C_OPT_FLAGS) $(HAMR_FLAGS) $(SENSEI_FLAGS) -I./ \
 	newton.cpp $(newtonpp_objs) -o newtonpp_clang_omp \
-	$(CLINK) $(MPI_LINK) $(OMP_LINK) $(SENSEI_LINK) $(HAMR_LINK) \
+	$(CLINK) $(MPI_LINK) $(OMP_LINK) $(SENSEI_LINK) $(HAMR_LINK) $(HDF5_LINK) \
 	stream_compact.a ${CUDA}/libcudart_static.a
 
 

@@ -1,8 +1,8 @@
 
 #module load /work2/cuda/hpc_sdk/modulefiles/nvhpc/23.3
 
-USE_MAGI=1
-USE_SENSEI=1
+USE_MAGI=
+USE_SENSEI=
 USE_GPU_DIRECT=
 USE_OMP_LOOP=1
 
@@ -15,7 +15,7 @@ MPI_LINK=-Wl,-rpath -Wl,$$ORIGIN:$$ORIGIN/../../lib:$$ORIGIN/../../../lib:$$ORIG
 OMP_FLAGS=-cuda -mp=gpu -DNEWTONPP_ENABLE_OMP -DNEWTONPP_ENABLE_CUDA
 OMP_LINK=
 
-CFLAGS=-lm -Wall -Wextra -fPIC
+CFLAGS=-std=c++17 -lm -Wall -Wextra -fPIC
 CLINK=-lm -lstdc++
 
 C_OPT_FLAGS=-O3 -march=native -mtune=native
@@ -31,7 +31,7 @@ ifneq ($(USE_MAGI),)
 	HDF5_LINK=-L/work/SENSEI/hdf5-1.14.1-2-install/lib -lhdf5
 endif
 
-SENSEI=/work/SENSEI/sensei-svtk-install-nvhpc
+SENSEI=/work/SENSEI/sensei-svtk-install-nvhpc-cuda-omp/
 ifneq ($(USE_SENSEI),)
 	CFLAGS += -DNEWTONPP_ENABLE_SENSEI
 	SENSEI_LINK=`${SENSEI}/bin/sensei_config --libs`
@@ -81,7 +81,8 @@ stream_compact.a: stream_compact.cu stream_compact.cxx
 
 
 newtonpp_objs=domain_decomp.o initialize_file.o patch_data.o communication.o \
-	 initialize_random.o patch.o patch_force.o solver.o write_vtk.o command_line.o
+	 initialize_random.o patch.o patch_force.o solver.o write_vtk.o command_line.o \
+	 timer_stack.o
 
 ifneq ($(USE_SENSEI),)
 	newtonpp_objs += sensei_adaptor.o insitu.o
