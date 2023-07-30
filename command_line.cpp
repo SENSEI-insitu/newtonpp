@@ -140,7 +140,7 @@ int parse_command_line(int argc, char **argv, MPI_Comm comm,
             {
                 num_devs = atol(argv[++q]);
                 if (rank == 0)
-                    std::cerr << " === newton++ === : " << num_devs << " in use per node" << std::endl;
+                    std::cerr << " === newton++ === : " << num_devs << " devices in use per node" << std::endl;
             }
             else if(strcmp(argv[q], "--start_dev") == 0)
             {
