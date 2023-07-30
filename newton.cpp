@@ -57,6 +57,7 @@ int main(int argc, char **argv)
     int n_ranks = 1;
     MPI_Comm comm = MPI_COMM_WORLD;
 
+#if 1
     int thread_level = 0;
     if ((MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_level) != MPI_SUCCESS) ||
         (thread_level != MPI_THREAD_MULTIPLE))
@@ -64,6 +65,9 @@ int main(int argc, char **argv)
         std::cerr << "Error: failed to initialize MPI" << std::endl;
         return -1;
     }
+#else
+    MPI_Init(&argc, &argv);
+#endif
 
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &n_ranks);
@@ -102,6 +106,7 @@ int main(int argc, char **argv)
     // set the device to use
     int dev = rank % num_devs * dev_stride + start_dev;
     omp_set_default_device(dev);
+    //std::cerr << " === newton++ === : rank " << rank << "  device " << dev << " of " << num_devs << std::endl;
 #endif
 
     // load the initial condition and initialize the bodies
@@ -194,17 +199,17 @@ int main(int argc, char **argv)
     long it = 0;
     while (it < n_its)
     {
+        timer.push();
 #if defined(_OPENMP)
         omp_set_default_device(dev);
 #endif
         // update bodies
         timer.push();
-        timer.push();
         velocity_verlet(comm, pd, pf, G, h, eps, nf);
         timer.pop("integrate part");
 
         // update partition
-        if ((it % part_int) == 0)
+        if (part_int && (((it + 1) % part_int) == 0))
         {
             timer.push();
             hamr::buffer<int> dest(def_alloc());
@@ -224,7 +229,7 @@ int main(int argc, char **argv)
 
 #if defined(NEWTONPP_ENABLE_SENSEI)
         // process current state
-        if (is_int && is_data)
+        if ((((it + 1) % is_int) == 0) && is_data)
         {
             timer.push();
             if (update_insitu(comm, is_data, it, it*h, patches, pd, pf))
