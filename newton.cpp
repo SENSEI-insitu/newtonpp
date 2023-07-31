@@ -139,7 +139,7 @@ int main(int argc, char **argv)
     else
 #endif
     {
-        if (initialize_random(comm, n_bodies, patches, pd, h, eps, nfr))
+        if (initialize_random(comm, n_bodies, patches, pd, nfr))
             return -1;
     }
     timer.pop("read ic");

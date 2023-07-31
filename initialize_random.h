@@ -8,10 +8,10 @@
 #include <mpi.h>
 
 /** generate an initial condition for nb randomly positioned bodies in a 3D
- * domain.
+ * domain. A good starting point for h is 4.*24.*3600.
  */
 int initialize_random(MPI_Comm comm, long nb,
     std::vector<patch> &patches, patch_data &lpd,
-    double &h, double &eps, double &nfr);
+    double &nfr);
 
 #endif

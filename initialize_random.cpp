@@ -112,7 +112,7 @@ void initialize_random(MPI_Comm comm, long n, const patch &dom,
 // --------------------------------------------------------------------------
 int initialize_random(MPI_Comm comm,
     std::vector<patch> &patches, patch_data &lpd,
-    double &h, double &eps, double &nfr, long nb)
+    double &nfr, long nb)
 {
     int rank = 0;
     int n_ranks = 1;
@@ -134,9 +134,6 @@ int initialize_random(MPI_Comm comm,
     double v0 = 1.0e3;
     double v1 = 10.0e3;
 
-    h = 4.*24.*3600.;
-    eps = 0.;
-
     double dx = x1 - x0;
     double dy = y1 - y0;
     double dz = z1 - z0;
@@ -155,13 +152,13 @@ int initialize_random(MPI_Comm comm,
 // --------------------------------------------------------------------------
 int initialize_random(MPI_Comm comm, long nb,
     std::vector<patch> &patches, patch_data &lpd,
-    double &h, double &eps, double &nfr)
+    double &nfr)
 {
     int rank = 0;
     MPI_Comm_rank(comm, &rank);
 
     // initialize
-    if (initialize_random(comm, patches, lpd, h, eps, nfr, nb))
+    if (initialize_random(comm, patches, lpd, nfr, nb))
         return -1;
 
     long lnb = lpd.size();
@@ -171,8 +168,7 @@ int initialize_random(MPI_Comm comm, long nb,
     if (rank == 0)
     {
         std::cerr << " === newton++ === : initialized " << tnb << " bodies on "
-            << patches.size() << " patches. h=" << h << " eps=" << eps << " nfr="
-            << nfr << std::endl;
+            << patches.size() << " patches. nfr=" << nfr << std::endl;
     }
 
     return 0;
