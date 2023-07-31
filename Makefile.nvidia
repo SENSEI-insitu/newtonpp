@@ -18,7 +18,7 @@ OMP_LINK=
 CFLAGS=-std=c++17 -lm -Wall -Wextra -fPIC
 CLINK=-lm -lstdc++
 
-C_OPT_FLAGS=-O3 -march=native -mtune=native
+C_OPT_FLAGS=-O3 -fast -march=native -mtune=native
 
 CUDA_OPT_FLAGS=-O3
 CUDA_XOPT_FLAGS=-O3,-march=native,-mtune=native
