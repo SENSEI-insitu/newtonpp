@@ -1,0 +1,103 @@
+
+# module swap PrgEnv-gnu PrgEnv-nvidia
+# module swap nvidia/22.7 nvidia/23.1
+# module load cpu
+
+CUDA_ARCH=80
+
+
+USE_MAGI=
+USE_SENSEI=1
+USE_GPU_DIRECT=
+USE_OMP_LOOP=
+
+CXX=`which nvc++`
+
+MPI_FLAGS=`pkg-config /opt/cray/pe/mpich/8.1.25/ofi/nvidia/20.7/lib/pkgconfig/mpich.pc --cflags`
+MPI_LINK=`pkg-config /opt/cray/pe/mpich/8.1.25/ofi/nvidia/20.7/lib/pkgconfig/mpich.pc --libs`
+
+OMP_FLAGS=-std=c++17 -cuda -mp=gpu -gpu=cc${CUDA_ARCH} -DNEWTONPP_ENABLE_OMP -DNEWTONPP_ENABLE_CUDA -DNVHPC_PERLMUTTER
+OMP_LINK=
+
+CFLAGS=-lm -Wall -Wextra -fPIC
+CLINK=-lm -lstdc++
+
+C_OPT_FLAGS=-O3 -march=native -mtune=native -fast
+
+CUDA_OPT_FLAGS=-O3 -fast
+CUDA_XOPT_FLAGS=-O3,-fast,-march=native,-mtune=native
+
+ifneq ($(USE_MAGI),)
+	CFLAGS += -DNEWTONPP_ENABLE_MAGI
+	HDF5_FLAGS=-I/work/SENSEI/hdf5-1.14.1-2-install/include
+	HDF5_LINK=-L/work/SENSEI/hdf5-1.14.1-2-install/lib -lhdf5
+endif
+
+SENSEI=/pscratch/sd/l/loring/sensei-install-nvhpc_cuda_omp/
+ifneq ($(USE_SENSEI),)
+	CFLAGS += -DNEWTONPP_ENABLE_SENSEI
+	SENSEI_LINK=`${SENSEI}/bin/sensei_config --libs`
+	SENSEI_FLAGS=`${SENSEI}/bin/sensei_config --cflags`
+	SENSEI_PYTHON_DIR=`${SENSEI}/bin/sensei_config --python-dir`
+	SENSEI_LINK += -Wl,-rpath=$(SENSEI_PYTHON_DIR)
+endif
+
+ifneq ($(USE_SENSEI),)
+	HAMR=$(SENSEI)/
+else
+	HAMR=/work/SENSEI/HAMR-install-nvhpc/
+endif
+HAMR_FLAGS=-I$(HAMR)/include
+HAMR_LINK=$(HAMR)/lib64/libhamr.a
+
+ifneq ($(USE_GPU_DIRECT),)
+	CFLAGS += -DNEWTONPP_GPU_DIRECT
+endif
+
+ifneq ($(USE_OMP_LOOP),)
+	CFLAGS += -DNEWTONPP_USE_OMP_LOOP
+endif
+
+
+.PHONY: all
+all : newtonpp_nv_omp
+
+.PHONY: ics
+ics: galaxy_ic plot_ic
+
+.PHONY: clean
+clean:
+	rm -f *.o newtonpp_nv_omp
+
+#stream_compact.a: stream_compact.cu stream_compact.cxx
+#	$(CXX) $(CFLAGS) $(C_OPT_FLAGS) -fPIC stream_compact.cxx -c -o stream_compact_cpu.o
+#	nvcc $(CUDA_OPT_FLAGS) -arch=sm_${CUDA_ARCH} -dc -o stream_compact_dc.o stream_compact.cu -Xcompiler -fPIE,$(CUDA_XOPT_FLAGS)
+#	nvcc $(CUDA_OPT_FLAGS) -arch=sm_${CUDA_ARCH} -dlink -o stream_compact.o stream_compact_dc.o -lcudart -Xcompiler -fPIE,$(CUDA_XOPT_FLAGS)
+#	rm -f stream_compact.a
+#	ar cru stream_compact.a stream_compact_cpu.o stream_compact.o stream_compact_dc.o
+#	ranlib stream_compact.a
+
+%.o: %.cpp
+	$(CXX) $(CFLAGS) $(C_OPT_FLAGS) $(OMP_FLAGS) $(MPI_FLAGS) $(HDF5_FLAGS) $(HAMR_FLAGS) $(SENSEI_FLAGS) -I./ -c $< -o $@
+
+
+newtonpp_objs=stream_compact_cuda.o stream_compact_host.o \
+     domain_decomp.o initialize_file.o patch_data.o communication.o \
+	 initialize_random.o patch.o patch_force.o solver.o write_vtk.o command_line.o \
+	 timer_stack.o
+
+ifneq ($(USE_SENSEI),)
+	newtonpp_objs += sensei_adaptor.o insitu.o
+endif
+
+ifneq ($(USE_MAGI),)
+	newtonpp_objs += read_magi.o
+endif
+
+newtonpp_nv_omp: $(newtonpp_objs) newton.cpp
+	$(CXX) $(OMP_FLAGS) $(MPI_FLAGS) $(HDF5_FLAGS) $(CFLAGS) \
+	$(C_OPT_FLAGS) $(HAMR_FLAGS) $(SENSEI_FLAGS) -I./ \
+	newton.cpp $(newtonpp_objs) -lcudart  \
+	$(SENSEI_LINK) $(HAMR_LINK) $(CLINK) $(MPI_LINK) $(HDF5_LINK) $(OMP_LINK) \
+	-o newtonpp_nv_omp
+
