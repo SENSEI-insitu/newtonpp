@@ -60,6 +60,24 @@ Other makefiles found in the repo may or may not work and not be maintained.
 | `-DNEWTONPP_ENABLE_CUDA` | Enable CUDA optimized stream compact algorithm. OpenMP must also be enabled. |
 | `-DNEWTONPP_ENABLE_MAGI` | Enable MAGI reader for initial conditions. |
 
+### Compiling on Perlmutter
+
+| Makefile | Status |
+| -------- | ------ |
+| Makefile.perlmutter.nvidia |  NVIDIA HPC SDK build for OpenMP offlaod and CUDA. |
+| Makefile.perlmutter.clang | Mainline clang build for OpenMP offload and CUDA. |
+
+#### Nvidia HPC Compiler
+```bash
+module swap PrgEnv-gnu/8.3.3 PrgEnv-nvidia
+module swap gpu cpu
+module swap nvidia/22.7 nvidia/23.1
+```
+
+#### LLVM Clang >= 17
+```bash
+module load llvm/nightly
+```
 
 ## Running
 
@@ -67,18 +85,22 @@ Other makefiles found in the repo may or may not work and not be maintained.
 
 | Option | Description |
 | ------ | ----------- |
-| --G | gravitational constant|
-| --dt | time step size|
-| --eps | softening length|
-| --theta | threshold for reduced representation|
-| --n_its | how many iterations to perform|
-| --n_bodies | the total number of bodies|
-| --magi_h5 | MAGI file with particle positions|
-| --magi_sum | MAGI file with component sizes|
-| --out_dir | where to write the results|
-| --out_int | how often to write results|
-| --sensei_xml | a sensei configuration file|
-| --sensei_int | how often to invoke in situ|
+| --G          | gravitational constant |
+| --dt         | time step size |
+| --eps        | softening length |
+| --theta      | threshold for reduced representation |
+| --n_its      | how many iterations to perform |
+| --n_bodies   | the total number of bodies |
+| --part_int   | how often to repartition particles |
+| --magi_h5    | MAGI file with particle positions |
+| --magi_sum   | MAGI file with component sizes |
+| --out_dir    | where to write the results |
+| --out_int    | how often to write results |
+| --sensei_xml | a sensei configuration file |
+| --sensei_int | how often to invoke in situ |
+| --num_devs   | how many devices to use per node |
+| --start_dev  | the first device to use |
+| --dev_stride | the number of devices to skip |
 
 ### Using the built in uniform random initial condition
 ```
@@ -95,8 +117,8 @@ mpiexec -np 4 ./newtonpp_clang15_omp --magi_file /work/SENSEI/magi/bin/dat/s15.t
 ## SENSEI in-situ
 Currently one needs to use the sensei_data_array branch. See [PR #101](https://github.com/SENSEI-insitu/SENSEI/pull/101).<br>
 To make use of GPU's SENSEI needs to configure HAMR for OpenMP `-DHAMR_ENABLE_OPENMP -DHAMR_OPENMP_ARCH=sm_75` (cc75 if using nvc++). <br>
-One can optional use both CUDA and OpenMP in SENSEI with the NVIDIA HPC compiler. <br>
-Test with the sensei::Histogram and sensei::ParticleDensity analysis back ends. Others should work as well, but those could use CPU or GPU via CUDA. <br>
 
+One can optional use both CUDA and OpenMP in SENSEI with the NVIDIA HPC compiler. <br>
+Test with the sensei::Histogram and sensei::DataBinning analysis back ends. SENSEI XML configurations are included in the repo. Other back ends should work as well but these two will use CUDA. <br>
 
 
