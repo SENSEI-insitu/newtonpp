@@ -27,16 +27,18 @@ and systems. Select one of the Makefiles and modify for your system.
 **optional:** OpenMP, CUDA, HDF5, SENSEI <br>
 
 It is recommended to use OpenMP offload as the CPU implemnentation is not full optimized.
+When the clang compiler is used version 17 later than May 2023 is required.
+When the nvidia HPC compiler is used version 23.1 or later is required.
 
 ### Makefiles
 
 | Makefile | Status |
 | -------- | ------ |
-| Makefile.debug | GCC build for the CPU only. This is a good start |
 | Makefile.nvidia | NVIDIA HPC SDK build for OpenMP offlaod and CUDA. |
-| Makefile.clang15 | Mainline clang build for OpenMP offload and CUDA. |
+| Makefile.clang17 | Mainline clang build for OpenMP offload and CUDA. |
+| Makefile.debug | GCC build for the CPU only. This is a good start. |
 
-Other makefiles found in the repo may or may not work and be maintained.
+Other makefiles found in the repo may or may not work and not be maintained.
 
 ### Makefile variables
 
