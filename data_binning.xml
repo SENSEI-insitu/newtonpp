@@ -1,9 +1,9 @@
 <sensei>
   <!-- x y -->
   <analysis type="DataBinning"
-    mesh="bodies" x_axis="x" y_axis="y" out_dir="s15_8_clang"
+    mesh="bodies" x_axis="x" y_axis="y" out_dir="bin_out"
     xres="128" yres="128" verbose="0"
-    device_id="-2" device_start="1" device_stride="1" devices_to_use="1"
+    device_id="-2" devices_start="0" device_stride="1" devices_to_use="1"
     async="1" enabled="1">
     <arrays>
       m x y z vu vv vw fu fv fw
@@ -21,9 +21,9 @@
 
   <!-- x z -->
   <analysis type="DataBinning"
-    mesh="bodies" x_axis="x" y_axis="z" out_dir="s15_8_clang"
+    mesh="bodies" x_axis="x" y_axis="z" out_dir="bin_out"
     xres="128" yres="128" verbose="0"
-    device_id="-2" device_start="1" device_stride="1" devices_to_use="1"
+    device_id="-2" devices_start="0" device_stride="1" devices_to_use="1"
     async="1" enabled="1">
     <arrays>
       m x y z vu vv vw fu fv fw
@@ -41,9 +41,9 @@
 
   <!-- y z -->
   <analysis type="DataBinning"
-    mesh="bodies" x_axis="y" y_axis="z" out_dir="s15_8_clang"
+    mesh="bodies" x_axis="y" y_axis="z" out_dir="bin_out"
     xres="128" yres="128" verbose="0"
-    device_id="-2" device_start="1" device_stride="1" devices_to_use="1"
+    device_id="-2" devices_start="0" device_stride="1" devices_to_use="1"
     async="1" enabled="1">
     <arrays>
       m x y z vu vv vw fu fv fw
@@ -61,9 +61,9 @@
 
   <!-- x vu -->
   <analysis type="DataBinning"
-    mesh="bodies" x_axis="x" y_axis="vu" out_dir="s15_8_clang"
+    mesh="bodies" x_axis="x" y_axis="vu" out_dir="bin_out"
     xres="128" yres="128" verbose="0"
-    device_id="-2" device_start="1" device_stride="1" devices_to_use="1"
+    device_id="-2" devices_start="0" device_stride="1" devices_to_use="1"
     async="1" enabled="1">
     <arrays>
       m x y z vu vv vw fu fv fw
@@ -81,9 +81,9 @@
 
   <!-- x vv -->
   <analysis type="DataBinning"
-    mesh="bodies" x_axis="x" y_axis="vv" out_dir="s15_8_clang"
+    mesh="bodies" x_axis="x" y_axis="vv" out_dir="bin_out"
     xres="128" yres="128" verbose="0"
-    device_id="-2" device_start="1" device_stride="1" devices_to_use="1"
+    device_id="-2" devices_start="0" device_stride="1" devices_to_use="1"
     async="1" enabled="1">
     <arrays>
       m x y z vu vv vw fu fv fw
@@ -101,9 +101,9 @@
 
   <!-- x vw -->
   <analysis type="DataBinning"
-    mesh="bodies" x_axis="x" y_axis="vw" out_dir="s15_8_clang"
+    mesh="bodies" x_axis="x" y_axis="vw" out_dir="bin_out"
     xres="128" yres="128" verbose="0"
-    device_id="-2" device_start="1" device_stride="1" devices_to_use="1"
+    device_id="-2" devices_start="0" device_stride="1" devices_to_use="1"
     async="1" enabled="1">
     <arrays>
       m x y z vu vv vw fu fv fw
@@ -121,9 +121,9 @@
 
   <!-- y vu -->
   <analysis type="DataBinning"
-    mesh="bodies" x_axis="y" y_axis="vu" out_dir="s15_8_clang"
+    mesh="bodies" x_axis="y" y_axis="vu" out_dir="bin_out"
     xres="128" yres="128" verbose="0"
-    device_id="-2" device_start="1" device_stride="1" devices_to_use="1"
+    device_id="-2" devices_start="0" device_stride="1" devices_to_use="1"
     async="1" enabled="1">
     <arrays>
       m x y z vu vv vw fu fv fw
@@ -141,9 +141,9 @@
 
   <!-- y vv -->
   <analysis type="DataBinning"
-    mesh="bodies" x_axis="y" y_axis="vv" out_dir="s15_8_clang"
+    mesh="bodies" x_axis="y" y_axis="vv" out_dir="bin_out"
     xres="128" yres="128" verbose="0"
-    device_id="-2" device_start="1" device_stride="1" devices_to_use="1"
+    device_id="-2" devices_start="0" device_stride="1" devices_to_use="1"
     async="1" enabled="1">
     <arrays>
       m x y z vu vv vw fu fv fw
@@ -161,9 +161,9 @@
 
   <!-- y vw -->
   <analysis type="DataBinning"
-    mesh="bodies" x_axis="y" y_axis="vw" out_dir="s15_8_clang"
+    mesh="bodies" x_axis="y" y_axis="vw" out_dir="bin_out"
     xres="128" yres="128" verbose="0"
-    device_id="-2" device_start="1" device_stride="1" devices_to_use="1"
+    device_id="-2" devices_start="0" device_stride="1" devices_to_use="1"
     async="1" enabled="1">
     <arrays>
       m x y z vu vv vw fu fv fw
@@ -181,9 +181,9 @@
 
   <!-- z vu -->
   <analysis type="DataBinning"
-    mesh="bodies" x_axis="z" y_axis="vu" out_dir="s15_8_clang"
+    mesh="bodies" x_axis="z" y_axis="vu" out_dir="bin_out"
     xres="128" yres="128" verbose="0"
-    device_id="-2" device_start="1" device_stride="1" devices_to_use="1"
+    device_id="-2" devices_start="0" device_stride="1" devices_to_use="1"
     async="1" enabled="1">
     <arrays>
       m x y z vu vv vw fu fv fw
@@ -201,9 +201,9 @@
 
   <!-- z vv -->
   <analysis type="DataBinning"
-    mesh="bodies" x_axis="z" y_axis="vv" out_dir="s15_8_clang"
+    mesh="bodies" x_axis="z" y_axis="vv" out_dir="bin_out"
     xres="128" yres="128" verbose="0"
-    device_id="-2" device_start="1" device_stride="1" devices_to_use="1"
+    device_id="-2" devices_start="0" device_stride="1" devices_to_use="1"
     async="1" enabled="1">
     <arrays>
       m x y z vu vv vw fu fv fw
@@ -221,9 +221,9 @@
 
   <!-- z vw -->
   <analysis type="DataBinning"
-    mesh="bodies" x_axis="z" y_axis="vw" out_dir="s15_8_clang"
+    mesh="bodies" x_axis="z" y_axis="vw" out_dir="bin_out"
     xres="128" yres="128" verbose="0"
-    device_id="-2" device_start="1" device_stride="1" devices_to_use="1"
+    device_id="-2" devices_start="0" device_stride="1" devices_to_use="1"
     async="1" enabled="1">
     <arrays>
       m x y z vu vv vw fu fv fw
